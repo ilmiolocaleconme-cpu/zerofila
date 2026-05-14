@@ -3,7 +3,8 @@ let cart = JSON.parse(
 ) || [];
 
 function addToCart(prodotto) {
-  const esistente = cart.find(p => p.id === prodotto.id);
+  const esistente = cart.find(
+    p => p.id === prodotto.id);
 
   if (esistente) {
     esistente.quantita += 1;
@@ -15,6 +16,7 @@ function addToCart(prodotto) {
   }
 
   renderCart();
+  saveCart();
 }
 
 function renderCart() {
@@ -66,6 +68,7 @@ function increaseQuantity(id) {
   }
 
   renderCart();
+  saveCart();
 }
 
 function decreaseQuantity(id) {
@@ -80,6 +83,7 @@ function decreaseQuantity(id) {
   }
 
   renderCart();
+  saveCart();
 }
 
 document
@@ -145,6 +149,7 @@ document
     cart = [];
 
     renderCart();
+    saveCart();
   });
 
 function saveCart() {
