@@ -93,7 +93,7 @@ document
       return sum + (p.prezzo * p.quantita);
     }, 0);
 
-    const { data: ordine, error } = await supabase
+    const { data: ordine, error } = await supabaseClient
       .from("ordini")
       .insert([
         {
@@ -119,7 +119,7 @@ document
       quantita: p.quantita
     }));
 
-    const { error: prodottiError } = await supabase
+    const { error: prodottiError } = await supabaseClient
       .from("ordine_prodotti")
       .insert(prodottiOrdine);
 
