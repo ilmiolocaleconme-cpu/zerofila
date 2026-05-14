@@ -1,7 +1,17 @@
 let cart = [];
 
 function addToCart(prodotto) {
-  cart.push(prodotto);
+  const esistente = cart.find(p => p.id === prodotto.id);
+
+  if (esistente) {
+    esistente.quantita += 1;
+  } else {
+    cart.push({
+      ...prodotto,
+      quantita: 1
+    });
+  }
+
   renderCart();
 }
 
@@ -13,52 +23,120 @@ function renderCart() {
 
   let totale = 0;
 
-  cart.forEach((item, index) => {
-    totale += item.prezzo;
+  cart.forEach(prodotto => {
+    totale += prodotto.prezzo * prodotto.quantita;
 
     cartItems.innerHTML += `
       <div class="cart-item">
-        <p>${item.nome} - € ${item.prezzo}</p>
+        <h4>${prodotto.nome}</h4>
 
-        <button onclick="removeFromCart(${index})">
-          ❌
-        </button>
+        <p>
+          € ${prodotto.prezzo} x ${prodotto.quantita}
+        </p>
+
+        <div class="cart-controls">
+          <button onclick="decreaseQuantity('${prodotto.id}')">-</button>
+
+          <span>${prodotto.quantita}</span>
+
+          <button onclick="increaseQuantity('${prodotto.id}')">+</button>
+        </div>
       </div>
     `;
   });
 
-  cartTotal.innerText = `Totale: € ${totale}`;
+  cartTotal.innerText = `Totale: €${totale}`;
 }
 
-function removeFromCart(index) {
-  cart.splice(index, 1);
+function increaseQuantity(id) {
+  const prodotto = cart.find(p => p.id == id);
+
+  if (prodotto) {
+    prodotto.quantita += 1;
+  }
+
+  renderCart();
+}
+
+function decreaseQuantity(id) {
+  const prodotto = cart.find(p => p.id == id);
+
+  if (prodotto) {
+    prodotto.quantita -= 1;
+
+    if (prodotto.quantita <= 0) {
+      cart = cart.filter(p => p.id != id);
+    }
+  }
+
   renderCart();
 }
 
 document
   .getElementById("send-order")
-  .addEventListener("click", () => {
+  .addEventListener("click", async () => {
 
     if (cart.length === 0) {
       alert("Carrello vuoto");
       return;
     }
 
-    let messaggio = "Nuovo Ordine:%0A%0A";
+    const totale = cart.reduce((sum, p) => {
+      return sum + (p.prezzo * p.quantita);
+    }, 0);
 
-    cart.forEach(item => {
-      messaggio += `• ${item.nome} - € ${item.prezzo}%0A`;
+    const { data: ordine, error } = await supabase
+      .from("ordini")
+      .insert([
+        {
+          totale: totale,
+          stato: "ricevuto",
+          tipo_ordine: "asporto"
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error(error);
+      alert("Errore creazione ordine");
+      return;
+    }
+
+    const prodottiOrdine = cart.map(p => ({
+      ordine_id: ordine.id,
+      prodotto_id: p.id,
+      nome_prodotto: p.nome,
+      prezzo: p.prezzo,
+      quantita: p.quantita
+    }));
+
+    const { error: prodottiError } = await supabase
+      .from("ordine_prodotti")
+      .insert(prodottiOrdine);
+
+    if (prodottiError) {
+      console.error(prodottiError);
+      alert("Errore salvataggio prodotti");
+      return;
+    }
+
+    let messaggio = "🍔 NUOVO ORDINE ZeroFila%0A%0A";
+
+    cart.forEach(p => {
+      messaggio += `• ${p.nome} x${p.quantita}%0A`;
     });
 
-    const totale = cart.reduce(
-      (sum, item) => sum + item.prezzo,
-      0
-    );
-
-    messaggio += `%0A Totale: € ${totale}`;
+    messaggio += `%0ATotale: €${totale}`;
 
     window.open(
-      `https://wa.me/3896190004?text=${messaggio}`,
+      `https://wa.me/393896190004?text=${messaggio}`,
       "_blank"
     );
-});
+
+    cart = [];
+
+    renderCart();
+
+    alert("Ordine inviato!");
+  });
