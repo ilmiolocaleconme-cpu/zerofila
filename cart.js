@@ -146,3 +146,12 @@ document
 
     renderCart();
   });
+
+function saveCart() {
+  localStorage.setItem(
+    "zerofila_cart",
+    JSON.stringify(cart)
+  );
+}
+
+renderCart();
