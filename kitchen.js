@@ -146,3 +146,23 @@ supabaseClient
     }
   )
   .subscribe();
+
+async function updateOrderStatus(
+  ordineId,
+  nuovoStato
+) {
+
+  const { error } =
+    await supabaseClient
+      .from("ordini")
+      .update({
+        stato: nuovoStato
+      })
+      .eq("id", ordineId);
+
+  if (error) {
+    console.error(error);
+
+    alert("Errore aggiornamento stato");
+  }
+}
