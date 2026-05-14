@@ -172,3 +172,5 @@ supabaseClient
     }
   )
   .subscribe();
+
+setInterval(loadOrders, 5000);
