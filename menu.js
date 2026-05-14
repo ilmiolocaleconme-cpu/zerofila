@@ -51,6 +51,10 @@ async function caricaMenu() {
             <div class="prezzo">
               € ${prodotto.prezzo}
             </div>
+            <button onclick='addToCart(${JSON.stringify(prodotto)})'>
+            + Aggiungi
+          </button>
+            
           </div>
         `;
       });
