@@ -31,3 +31,19 @@ body {
   font-weight: bold;
   margin-top: 10px;
 }
+
+
+#kitchen-orders {
+  padding: 20px;
+}
+
+.ordine-card {
+  background: white;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.ordine-card h2 {
+  margin-top: 0;
+}
