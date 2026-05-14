@@ -1,4 +1,6 @@
-let cart = [];
+let cart = JSON.parse(
+  localStorage.getItem("zerofila_cart")
+) || [];
 
 function addToCart(prodotto) {
   const esistente = cart.find(p => p.id === prodotto.id);
