@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+}
+
+.header {
+  background: black;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+#menu-container {
+  padding: 20px;
+}
+
+.categoria {
+  margin-top: 40px;
+}
+
+.prodotto {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.prezzo {
+  font-weight: bold;
+  margin-top: 10px;
+}
