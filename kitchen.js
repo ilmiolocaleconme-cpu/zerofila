@@ -58,10 +58,59 @@ function renderOrders(ordini) {
           Ordine #${ordine.id.slice(0, 6)}
         </h2>
 
-        <p>
-          Stato:
-          <strong>${ordine.stato}</strong>
-        </p>
+        <div class="ordine-stato">
+
+  <p>
+    Stato:
+    <strong>${ordine.stato}</strong>
+  </p>
+
+  <select
+    onchange="updateOrderStatus(
+      '${ordine.id}',
+      this.value
+    )"
+  >
+
+    <option
+      value="ricevuto"
+      ${ordine.stato === "ricevuto"
+        ? "selected"
+        : ""}
+    >
+      Ricevuto
+    </option>
+
+    <option
+      value="preparazione"
+      ${ordine.stato === "preparazione"
+        ? "selected"
+        : ""}
+    >
+      Preparazione
+    </option>
+
+    <option
+      value="pronto"
+      ${ordine.stato === "pronto"
+        ? "selected"
+        : ""}
+    >
+      Pronto
+    </option>
+
+    <option
+      value="consegnato"
+      ${ordine.stato === "consegnato"
+        ? "selected"
+        : ""}
+    >
+      Consegnato
+    </option>
+
+  </select>
+
+</div>
 
         <ul>
           ${prodottiHTML}
