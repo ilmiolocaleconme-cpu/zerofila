@@ -58,7 +58,7 @@ document
     messaggio += `%0A Totale: € ${totale}`;
 
     window.open(
-      `https://wa.me/393896180004?text=${messaggio}`,
+      `https://wa.me/339 346 636 9797?text=${messaggio}`,
       "_blank"
     );
 });
