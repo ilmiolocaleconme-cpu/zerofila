@@ -47,3 +47,13 @@ body {
 .ordine-card h2 {
   margin-top: 0;
 }
+
+.ordine-stato {
+  margin-bottom: 15px;
+}
+
+.ordine-stato select {
+  padding: 8px;
+  border-radius: 8px;
+  margin-top: 5px;
+}
