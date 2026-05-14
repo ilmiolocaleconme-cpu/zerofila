@@ -129,8 +129,8 @@ document
 
     messaggio += `%0ATotale: €${totale}`;
 
-    window.open(
-      `https://wa.me/393896190004?text=${messaggio}`,
+    window.location.href =
+  `https://wa.me/393896190004?text=${messaggio}`,
       "_blank"
     );
 
