@@ -28,6 +28,7 @@ function renderCart() {
 
     cartItems.innerHTML += `
       <div class="cart-item">
+
         <h4>${prodotto.nome}</h4>
 
         <p>
@@ -35,12 +36,19 @@ function renderCart() {
         </p>
 
         <div class="cart-controls">
-          <button onclick="decreaseQuantity('${prodotto.id}')">-</button>
+
+          <button onclick="decreaseQuantity('${prodotto.id}')">
+            -
+          </button>
 
           <span>${prodotto.quantita}</span>
 
-          <button onclick="increaseQuantity('${prodotto.id}')">+</button>
+          <button onclick="increaseQuantity('${prodotto.id}')">
+            +
+          </button>
+
         </div>
+
       </div>
     `;
   });
@@ -130,13 +138,9 @@ document
     messaggio += `%0ATotale: €${totale}`;
 
     window.location.href =
-  `https://wa.me/393896190004?text=${messaggio}`,
-      "_blank"
-    );
+      `https://wa.me/393896190004?text=${messaggio}`;
 
     cart = [];
 
     renderCart();
-
-    alert("Ordine inviato!");
   });
