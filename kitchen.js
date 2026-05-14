@@ -60,57 +60,57 @@ function renderOrders(ordini) {
 
         <div class="ordine-stato">
 
-  <p>
-    Stato:
-    <strong>${ordine.stato}</strong>
-  </p>
+          <p>
+            Stato:
+            <strong>${ordine.stato}</strong>
+          </p>
 
-  <select
-    onchange="updateOrderStatus(
-      '${ordine.id}',
-      this.value
-    )"
-  >
+          <select
+            onchange="updateOrderStatus(
+              '${ordine.id}',
+              this.value
+            )"
+          >
 
-    <option
-      value="ricevuto"
-      ${ordine.stato === "ricevuto"
-        ? "selected"
-        : ""}
-    >
-      Ricevuto
-    </option>
+            <option
+              value="ricevuto"
+              ${ordine.stato === "ricevuto"
+                ? "selected"
+                : ""}
+            >
+              Ricevuto
+            </option>
 
-    <option
-      value="preparazione"
-      ${ordine.stato === "preparazione"
-        ? "selected"
-        : ""}
-    >
-      Preparazione
-    </option>
+            <option
+              value="preparazione"
+              ${ordine.stato === "preparazione"
+                ? "selected"
+                : ""}
+            >
+              Preparazione
+            </option>
 
-    <option
-      value="pronto"
-      ${ordine.stato === "pronto"
-        ? "selected"
-        : ""}
-    >
-      Pronto
-    </option>
+            <option
+              value="pronto"
+              ${ordine.stato === "pronto"
+                ? "selected"
+                : ""}
+            >
+              Pronto
+            </option>
 
-    <option
-      value="consegnato"
-      ${ordine.stato === "consegnato"
-        ? "selected"
-        : ""}
-    >
-      Consegnato
-    </option>
+            <option
+              value="consegnato"
+              ${ordine.stato === "consegnato"
+                ? "selected"
+                : ""}
+            >
+              Consegnato
+            </option>
 
-  </select>
+          </select>
 
-</div>
+        </div>
 
         <ul>
           ${prodottiHTML}
@@ -124,6 +124,32 @@ function renderOrders(ordini) {
       </div>
     `;
   });
+}
+
+
+
+async function updateOrderStatus(
+  ordineId,
+  nuovoStato
+) {
+
+  const { error } =
+    await supabaseClient
+      .from("ordini")
+      .update({
+        stato: nuovoStato
+      })
+      .eq("id", ordineId);
+
+  if (error) {
+    console.error(error);
+
+    alert("Errore aggiornamento stato");
+
+    return;
+  }
+
+  loadOrders();
 }
 
 
@@ -146,23 +172,3 @@ supabaseClient
     }
   )
   .subscribe();
-
-async function updateOrderStatus(
-  ordineId,
-  nuovoStato
-) {
-
-  const { error } =
-    await supabaseClient
-      .from("ordini")
-      .update({
-        stato: nuovoStato
-      })
-      .eq("id", ordineId);
-
-  if (error) {
-    console.error(error);
-
-    alert("Errore aggiornamento stato");
-  }
-}
