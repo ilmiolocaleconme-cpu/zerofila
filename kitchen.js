@@ -52,13 +52,13 @@ function renderOrders(ordini) {
     });
 
     kitchenContainer.innerHTML += `
-      <div class="ordine-card">
+      <div class="ordine-card stato-${ordine.stato}">
 
         <h2>
           Ordine #${ordine.id.slice(0, 6)}
         </h2>
 
-        <div class="ordine-card">
+        <div class="ordine-status">
 
           <p>
             Stato:
