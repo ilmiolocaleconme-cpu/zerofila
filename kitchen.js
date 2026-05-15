@@ -20,6 +20,7 @@ async function loadOrders() {
       });
 
   if (error) {
+
     console.error(error);
 
     kitchenContainer.innerHTML =
@@ -27,6 +28,12 @@ async function loadOrders() {
 
     return;
   }
+
+  renderOrders(data);
+}
+
+
+
 function renderSection(
   titolo,
   listaOrdini
@@ -35,6 +42,15 @@ function renderSection(
   kitchenContainer.innerHTML += `
     <h1>${titolo}</h1>
   `;
+
+  if (listaOrdini.length === 0) {
+
+    kitchenContainer.innerHTML += `
+      <p>Nessun ordine</p>
+    `;
+
+    return;
+  }
 
   listaOrdini.forEach(ordine => {
 
@@ -53,10 +69,10 @@ function renderSection(
     );
 
     kitchenContainer.innerHTML += `
-      <div class="ordine-card">
+      <div class="ordine-card stato-${ordine.stato}">
 
         <h2>
-          Ordine #${ordine.id.slice(0,6)}
+          Ordine #${ordine.id.slice(0, 6)}
         </h2>
 
         <div class="ordine-status">
@@ -136,8 +152,6 @@ function renderSection(
     `;
   });
 }
-  renderOrders(data);
-}
 
 
 
@@ -146,116 +160,44 @@ function renderOrders(ordini) {
   kitchenContainer.innerHTML = "";
 
   const ricevuti =
-  ordini.filter(o => o.stato === "ricevuto");
+    ordini.filter(
+      o => o.stato === "ricevuto"
+    );
 
-const preparazione =
-  ordini.filter(o => o.stato === "preparazione");
+  const preparazione =
+    ordini.filter(
+      o => o.stato === "preparazione"
+    );
 
-const pronti =
-  ordini.filter(o => o.stato === "pronto");
+  const pronti =
+    ordini.filter(
+      o => o.stato === "pronto"
+    );
 
-const consegnati =
-  ordini.filter(o => o.stato === "consegnato");
+  const consegnati =
+    ordini.filter(
+      o => o.stato === "consegnato"
+    );
 
-renderSection("🟡 Ricevuti", ricevuti);
+  renderSection(
+    "🟡 Ricevuti",
+    ricevuti
+  );
 
-renderSection(
-  "🟠 Preparazione",
-  preparazione
-);
+  renderSection(
+    "🟠 Preparazione",
+    preparazione
+  );
 
-renderSection("🟢 Pronti", pronti);
+  renderSection(
+    "🟢 Pronti",
+    pronti
+  );
 
-renderSection(
-  "⚫ Consegnati",
-  consegnati
-);
-
-    let prodottiHTML = "";
-
-    ordine.ordine_prodotti.forEach(prodotto => {
-
-      prodottiHTML += `
-        <li>
-          ${prodotto.quantita}x
-          ${prodotto.nome_prodotto}
-        </li>
-      `;
-    });
-
-    kitchenContainer.innerHTML += `
-      <div class="ordine-card stato-${ordine.stato}">
-
-        <h2>
-          Ordine #${ordine.id.slice(0, 6)}
-        </h2>
-
-        <div class="ordine-status">
-
-          <p>
-            Stato:
-            <strong>${ordine.stato}</strong>
-          </p>
-
-          <select
-            onchange="updateOrderStatus(
-              '${ordine.id}',
-              this.value
-            )"
-          >
-
-            <option
-              value="ricevuto"
-              ${ordine.stato === "ricevuto"
-                ? "selected"
-                : ""}
-            >
-              Ricevuto
-            </option>
-
-            <option
-              value="preparazione"
-              ${ordine.stato === "preparazione"
-                ? "selected"
-                : ""}
-            >
-              Preparazione
-            </option>
-
-            <option
-              value="pronto"
-              ${ordine.stato === "pronto"
-                ? "selected"
-                : ""}
-            >
-              Pronto
-            </option>
-
-            <option
-              value="consegnato"
-              ${ordine.stato === "consegnato"
-                ? "selected"
-                : ""}
-            >
-              Consegnato
-            </option>
-
-          </select>
-
-        </div>
-
-        <ul>
-          ${prodottiHTML}
-        </ul>
-
-        <p>
-          Totale:
-          € ${ordine.totale}
-        </p>
-
-      </div>
-    `;
-  });
+  renderSection(
+    "⚫ Consegnati",
+    consegnati
+  );
 }
 
 
@@ -274,9 +216,12 @@ async function updateOrderStatus(
       .eq("id", ordineId);
 
   if (error) {
+
     console.error(error);
 
-    alert("Errore aggiornamento stato");
+    alert(
+      "Errore aggiornamento stato"
+    );
 
     return;
   }
@@ -304,5 +249,7 @@ supabaseClient
     }
   )
   .subscribe();
+
+
 
 setInterval(loadOrders, 5000);
