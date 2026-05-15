@@ -27,7 +27,115 @@ async function loadOrders() {
 
     return;
   }
+function renderSection(
+  titolo,
+  listaOrdini
+) {
 
+  kitchenContainer.innerHTML += `
+    <h1>${titolo}</h1>
+  `;
+
+  listaOrdini.forEach(ordine => {
+
+    let prodottiHTML = "";
+
+    ordine.ordine_prodotti.forEach(
+      prodotto => {
+
+        prodottiHTML += `
+          <li>
+            ${prodotto.quantita}x
+            ${prodotto.nome_prodotto}
+          </li>
+        `;
+      }
+    );
+
+    kitchenContainer.innerHTML += `
+      <div class="ordine-card">
+
+        <h2>
+          Ordine #${ordine.id.slice(0,6)}
+        </h2>
+
+        <div class="ordine-status">
+
+          <p>
+            Stato:
+            <strong>
+              ${ordine.stato}
+            </strong>
+          </p>
+
+          <select
+            onchange="updateOrderStatus(
+              '${ordine.id}',
+              this.value
+            )"
+          >
+
+            <option
+              value="ricevuto"
+              ${
+                ordine.stato === "ricevuto"
+                ? "selected"
+                : ""
+              }
+            >
+              Ricevuto
+            </option>
+
+            <option
+              value="preparazione"
+              ${
+                ordine.stato === "preparazione"
+                ? "selected"
+                : ""
+              }
+            >
+              Preparazione
+            </option>
+
+            <option
+              value="pronto"
+              ${
+                ordine.stato === "pronto"
+                ? "selected"
+                : ""
+              }
+            >
+              Pronto
+            </option>
+
+            <option
+              value="consegnato"
+              ${
+                ordine.stato === "consegnato"
+                ? "selected"
+                : ""
+              }
+            >
+              Consegnato
+            </option>
+
+          </select>
+
+        </div>
+
+        <ul>
+          ${prodottiHTML}
+        </ul>
+
+        <p>
+          Totale:
+          € ${ordine.totale}
+        </p>
+
+      </div>
+    `;
+  });
+}
   renderOrders(data);
 }
 
@@ -37,7 +145,31 @@ function renderOrders(ordini) {
 
   kitchenContainer.innerHTML = "";
 
-  ordini.forEach(ordine => {
+  const ricevuti =
+  ordini.filter(o => o.stato === "ricevuto");
+
+const preparazione =
+  ordini.filter(o => o.stato === "preparazione");
+
+const pronti =
+  ordini.filter(o => o.stato === "pronto");
+
+const consegnati =
+  ordini.filter(o => o.stato === "consegnato");
+
+renderSection("🟡 Ricevuti", ricevuti);
+
+renderSection(
+  "🟠 Preparazione",
+  preparazione
+);
+
+renderSection("🟢 Pronti", pronti);
+
+renderSection(
+  "⚫ Consegnati",
+  consegnati
+);
 
     let prodottiHTML = "";
 
