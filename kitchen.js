@@ -1,7 +1,12 @@
 const kitchenContainer =
   document.getElementById("kitchen-orders");
 
+const newOrderSound =
+  document.getElementById(
+    "new-order-sound"
+  );
 
+let lastOrderCount = 0;
 
 async function loadOrders() {
 
@@ -29,7 +34,17 @@ async function loadOrders() {
     return;
   }
 
-  renderOrders(data);
+  if (
+  data.length > lastOrderCount &&
+  lastOrderCount !== 0
+) {
+
+  newOrderSound.play();
+}
+
+lastOrderCount = data.length;
+
+renderOrders(data);
 }
 
 
