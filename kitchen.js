@@ -2,6 +2,19 @@ const kitchenContainer =
   document.getElementById("kitchen-orders");
 
 const newOrderSound =
+  new Audio("notification.mp3");
+
+let lastOrderCount = 0;
+
+document
+  .getElementById("enable-audio")
+  .addEventListener("click", () => {
+
+    newOrderSound.play();
+
+  });
+
+const newOrderSound =
   document.getElementById(
     "new-order-sound"
   );
