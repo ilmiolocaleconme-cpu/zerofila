@@ -1,25 +1,18 @@
 const kitchenContainer =
   document.getElementById("kitchen-orders");
 
+
+
 const newOrderSound =
   new Audio("notification.mp3");
 
-let lastOrderCount = 0;
+newOrderSound.volume = 1;
 
-document
-  .getElementById("enable-audio")
-  .addEventListener("click", () => {
 
-    newOrderSound.play();
-
-  });
-
-const newOrderSound =
-  document.getElementById(
-    "new-order-sound"
-  );
 
 let lastOrderCount = 0;
+
+
 
 async function loadOrders() {
 
@@ -47,17 +40,80 @@ async function loadOrders() {
     return;
   }
 
-  if (
-  data.length > lastOrderCount &&
-  lastOrderCount !== 0
-) {
 
-  newOrderSound.play();
+
+  // Suono nuovo ordine
+  if (
+    data.length > lastOrderCount &&
+    lastOrderCount !== 0
+  ) {
+
+    newOrderSound.play()
+      .catch(err => {
+        console.log(
+          "Audio bloccato dal browser",
+          err
+        );
+      });
+
+  }
+
+  lastOrderCount = data.length;
+
+
+
+  renderOrders(data);
 }
 
-lastOrderCount = data.length;
 
-renderOrders(data);
+
+function renderOrders(ordini) {
+
+  kitchenContainer.innerHTML = "";
+
+
+
+  const ricevuti =
+    ordini.filter(
+      o => o.stato === "ricevuto"
+    );
+
+  const preparazione =
+    ordini.filter(
+      o => o.stato === "preparazione"
+    );
+
+  const pronti =
+    ordini.filter(
+      o => o.stato === "pronto"
+    );
+
+  const consegnati =
+    ordini.filter(
+      o => o.stato === "consegnato"
+    );
+
+
+
+  renderSection(
+    "🟡 Ricevuti",
+    ricevuti
+  );
+
+  renderSection(
+    "🟠 Preparazione",
+    preparazione
+  );
+
+  renderSection(
+    "🟢 Pronti",
+    pronti
+  );
+
+  renderSection(
+    "⚫ Consegnati",
+    consegnati
+  );
 }
 
 
@@ -68,21 +124,31 @@ function renderSection(
 ) {
 
   kitchenContainer.innerHTML += `
-    <h1>${titolo}</h1>
+    <h1 class="section-title">
+      ${titolo}
+    </h1>
   `;
+
+
 
   if (listaOrdini.length === 0) {
 
     kitchenContainer.innerHTML += `
-      <p>Nessun ordine</p>
+      <p class="empty-orders">
+        Nessun ordine
+      </p>
     `;
 
     return;
   }
 
+
+
   listaOrdini.forEach(ordine => {
 
     let prodottiHTML = "";
+
+
 
     ordine.ordine_prodotti.forEach(
       prodotto => {
@@ -93,11 +159,17 @@ function renderSection(
             ${prodotto.nome_prodotto}
           </li>
         `;
+
       }
     );
 
+
+
     kitchenContainer.innerHTML += `
-      <div class="ordine-card stato-${ordine.stato}">
+      <div class="
+        ordine-card
+        stato-${ordine.stato}
+      ">
 
         <h2>
           Ordine #${ordine.id.slice(0, 6)}
@@ -123,8 +195,8 @@ function renderSection(
               value="ricevuto"
               ${
                 ordine.stato === "ricevuto"
-                ? "selected"
-                : ""
+                  ? "selected"
+                  : ""
               }
             >
               Ricevuto
@@ -134,8 +206,8 @@ function renderSection(
               value="preparazione"
               ${
                 ordine.stato === "preparazione"
-                ? "selected"
-                : ""
+                  ? "selected"
+                  : ""
               }
             >
               Preparazione
@@ -145,8 +217,8 @@ function renderSection(
               value="pronto"
               ${
                 ordine.stato === "pronto"
-                ? "selected"
-                : ""
+                  ? "selected"
+                  : ""
               }
             >
               Pronto
@@ -156,8 +228,8 @@ function renderSection(
               value="consegnato"
               ${
                 ordine.stato === "consegnato"
-                ? "selected"
-                : ""
+                  ? "selected"
+                  : ""
               }
             >
               Consegnato
@@ -178,54 +250,9 @@ function renderSection(
 
       </div>
     `;
+
   });
-}
 
-
-
-function renderOrders(ordini) {
-
-  kitchenContainer.innerHTML = "";
-
-  const ricevuti =
-    ordini.filter(
-      o => o.stato === "ricevuto"
-    );
-
-  const preparazione =
-    ordini.filter(
-      o => o.stato === "preparazione"
-    );
-
-  const pronti =
-    ordini.filter(
-      o => o.stato === "pronto"
-    );
-
-  const consegnati =
-    ordini.filter(
-      o => o.stato === "consegnato"
-    );
-
-  renderSection(
-    "🟡 Ricevuti",
-    ricevuti
-  );
-
-  renderSection(
-    "🟠 Preparazione",
-    preparazione
-  );
-
-  renderSection(
-    "🟢 Pronti",
-    pronti
-  );
-
-  renderSection(
-    "⚫ Consegnati",
-    consegnati
-  );
 }
 
 
@@ -243,6 +270,8 @@ async function updateOrderStatus(
       })
       .eq("id", ordineId);
 
+
+
   if (error) {
 
     console.error(error);
@@ -253,6 +282,8 @@ async function updateOrderStatus(
 
     return;
   }
+
+
 
   loadOrders();
 }
@@ -273,11 +304,14 @@ supabaseClient
       table: "ordini"
     },
     () => {
+
       loadOrders();
+
     }
   )
   .subscribe();
 
 
 
+// Refresh automatico
 setInterval(loadOrders, 5000);
