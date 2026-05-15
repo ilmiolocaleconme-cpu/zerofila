@@ -57,3 +57,20 @@ body {
   border-radius: 8px;
   margin-top: 5px;
 }
+
+.stato-ricevuto {
+  border-left: 8px solid orange;
+}
+
+.stato-preparazione {
+  border-left: 8px solid dodgerblue;
+}
+
+.stato-pronto {
+  border-left: 8px solid green;
+}
+
+.stato-consegnato {
+  border-left: 8px solid gray;
+  opacity: 0.7;
+}
