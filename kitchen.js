@@ -58,7 +58,7 @@ function renderOrders(ordini) {
           Ordine #${ordine.id.slice(0, 6)}
         </h2>
 
-        <div class="ordine-stato">
+        <div class="ordine-card">
 
           <p>
             Stato:
