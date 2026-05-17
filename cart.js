@@ -70,12 +70,15 @@ function modificaQuantita(carrelloId, azione) {
 }
 
 function agganciaControlliCarrello() {
+    if (!cartContainer) return;
     cartContainer.querySelectorAll(".btn-cart-piu").forEach(b => b.onclick = (e) => modificaQuantita(e.target.dataset.cid, "piu"));
     cartContainer.querySelectorAll(".btn-cart-meno").forEach(b => b.onclick = (e) => modificaQuantita(e.target.dataset.cid, "meno"));
 }
 
 async function apriModalPersonalizzazione(prodottoId) {
     const ristorante = JSON.parse(sessionStorage.getItem("zf_current_ristorante"));
+    if (!ristorante) return;
+    
     try {
         const [prodRes, extraRes] = await Promise.all([
             supabaseClient.from("prodotti").select("*").eq("id", prodottoId).single(),
@@ -87,7 +90,12 @@ async function apriModalPersonalizzazione(prodottoId) {
         const tuttiExtra = extraRes.data || [];
 
         piattoInPersonalizzazione = {
-            id: prodotto.id, nome: prodotto.nome, prezzoBase: prodotto.prezzo, prezzoFinale: prodotto.prezzo, rimossi: [], aggiunti: []
+            id: prodotto.id, 
+            nome: prodotto.nome, 
+            prezzoBase: prodotto.prezzo, 
+            prezzoFinale: prodotto.prezzo, 
+            rimossi: [], 
+            aggiunti: []
         };
 
         let ingredientiBaseHTML = "";
@@ -100,7 +108,9 @@ async function apriModalPersonalizzazione(prodottoId) {
                     </label>
                 `;
             });
-        } else { ingredientiBaseHTML = "<p style='color:var(--text-muted); font-style:italic;'>Nessun ingrediente base.</p>"; }
+        } else { 
+            ingredientiBaseHTML = "<p style='color:var(--text-muted); font-style:italic;'>Nessun ingrediente base.</p>"; 
+        }
 
         let ingredientiExtraHTML = "";
         if (tuttiExtra.length > 0) {
@@ -115,14 +125,16 @@ async function apriModalPersonalizzazione(prodottoId) {
                     </label>
                 `;
             });
-        } else { ingredientiExtraHTML = "<p style='color:var(--text-muted); font-style:italic;'>Nessun ingrediente extra.</p>"; }
+        } else { 
+            ingredientiExtraHTML = "<p style='color:var(--text-muted); font-style:italic;'>Nessun ingrediente extra.</p>"; 
+        }
 
         const modalHTML = `
         <div id="custom-pizza-modal" class="modal" style="z-index:10000;">
           <div class="modal-content" style="max-width:400px;">
             <h3 style="color:var(--color-pronto); margin-bottom:15px; text-align:center;">${prodotto.nome}</h3>
             <div style="margin-bottom:15px; max-height:180px; overflow-y:auto;">
-                <h4>Rimuovi Ingredienti</h4>
+                <h4>Modifica Ingredienti</h4>
                 ${ingredientiBaseHTML}
             </div>
             <div style="margin-bottom:20px; max-height:180px; overflow-y:auto; border-top:1px dashed #334155; padding-top:15px;">
@@ -164,33 +176,48 @@ async function apriModalPersonalizzazione(prodottoId) {
 
         baseCheckboxes.forEach(cb => cb.onchange = ricalcolaPrezzoPiatto);
         extraCheckboxes.forEach(cb => cb.onchange = ricalcolaPrezzoPiatto);
+        
         document.getElementById("btn-custom-cancel").onclick = () => modal.remove();
         document.getElementById("btn-custom-confirm").onclick = () => {
             let rimozioni = piattoInPersonalizzazione.rimossi.map(ing => `-${ing}`);
             let aggiunte = piattoInPersonalizzazione.aggiunti.map(ext => `+${ext.nome}`);
             let stringaModifiche = [...rimozioni, ...aggiunte].join(", ");
 
+            // CORREZIONE BUG FINALE DI TRONCAMENTO: Generazione ID univoco basato sulle modifiche btoa
             const carrelloId = `${piattoInPersonalizzazione.id}_${btoa(unescape(encodeURIComponent(stringaModifiche)))}`;
-            let currentCart = getCartItems();
-            const itemEsistente = currentCart.find(i => i.carrelloId === carrelloId);
+            let localCart = getCartItems();
 
-            if (itemEsistente) { itemEsistente.quantita++; } 
-            else {
-                currentCart.push({
-                    carrelloId, id: piattoInPersonalizzazione.id, nome: piattoInPersonalizzazione.nome,
-                    prezzo: piattoInPersonalizzazione.prezzoFinale, quantita: 1, modifiche: stringaModifiche || null
+            const itemEsistente = localCart.find(i => i.carrelloId === carrelloId);
+            if (itemEsistente) {
+                itemEsistente.quantita++;
+            } else {
+                localCart.push({
+                    carrelloId: carrelloId,
+                    id: piattoInPersonalizzazione.id,
+                    nome: piattoInPersonalizzazione.nome,
+                    prezzo: piattoInPersonalizzazione.prezzoFinale,
+                    quantita: 1,
+                    modifiche: stringaModifiche || null
                 });
             }
-            localStorage.setItem(getStorageKey(), JSON.stringify(currentCart));
+
+            localStorage.setItem(getStorageKey(), JSON.stringify(localCart));
             modal.remove();
             renderCart();
         };
-    } catch (err) { console.error(err); }
+
+    } catch (err) {
+        console.error("Errore nell'apertura personalizzazione:", err);
+    }
 }
 
+// ASCOLTATORE EVENTI CORE: Intercetta i click sui bottoni di aggiunta emessi da menu.js
 window.addEventListener("menuRendered", () => {
-    renderCart();
+    renderCart(); // Esegue il primo rendering visivo appena la pagina è pronta
     document.querySelectorAll(".btn-add-to-cart").forEach(button => {
-        button.onclick = (e) => apriModalPersonalizzazione(e.target.dataset.id);
+        button.onclick = (e) => {
+            const prodottoId = e.target.dataset.id;
+            apriModalPersonalizzazione(prodottoId);
+        };
     });
 });
