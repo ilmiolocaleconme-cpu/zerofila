@@ -163,48 +163,96 @@ async function inviaOrdineA_Supabase(modal, ristorante) {
         let copertoTotale = 0;
         if (tipo === "tavolo") { copertoTotale = numPersone * COPERTO_AMOUNT; subtotale += copertoTotale; }
 
+        // COMPILAZIONE PAYLOAD COMPLETA E REVISIONATA SENZA TRONCAMENTI
         const ordinePayload = {
-            ristorante_id: ristorante.id, totale: parseFloat(subtotale.toFixed(2)), stato: "ricevuto", tipo_ordine: tipo,
-            tavolo: tipo === "tavolo" ? tavolo : null, num_persone: tipo === "tavolo" ? numPersone : null,
-            indirizzo: tipo === "delivery" ? indirizzo : null, telefono: telefono, note: note || null, nome_cliente: nomeCliente,
-            codice_promo: scontoAttivo.codice, casino_sconto: parseFloat(valoreSconto.toFixed(2)), metodo_pagamento: metodoPagamento
+            ristorante_id: ristorante.id, 
+            totale: parseFloat(subtotale.toFixed(2)), 
+            stato: "ricevuto", 
+            tipo_ordine: tipo,
+            tavolo: tipo === "tavolo" ? tavolo : null, 
+            num_persone: tipo === "tavolo" ? numPersone : null,
+            indirizzo: tipo === "delivery" ? indirizzo : null, 
+            telefono: telefono, 
+            note: note || null, 
+            nome_cliente: nomeCliente,
+            codice_promo: scontoAttivo.codice, 
+            sconto_applicato: parseFloat(valoreSconto.toFixed(2)),
+            metodo_pagamento: metodoPagamento
         };
 
-        const { data: nuovoOrdine, error: oError } = await supabaseClient.from("ordini").insert([ordinePayload]).select().single();
+        const { data: nuovoOrdine, error: oError } = await supabaseClient
+            .from("ordini")
+            .insert([ordinePayload])
+            .select()
+            .single();
+
         if (oError) throw oError;
 
-        const { error: pError } = await supabaseClient.from("ordine_prodotti").insert(localCart.map(p => ({
-            ordine_id: nuovoOrdine.id, prodotto_id: p.id, quantita: p.quantita, nome_prodotto: p.nome, prezzo: p.prezzo, modifiche: p.modifiche || null
-        })));
+        const prodottiPayload = localCart.map(p => ({
+            ordine_id: nuovoOrdine.id,
+            prodotto_id: p.id,
+            quantita: p.quantita,
+            nome_prodotto: p.nome,
+            prezzo: p.prezzo,
+            modifiche: p.modifiche || null
+        }));
+
+        const { error: pError } = await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
         if (pError) throw pError;
 
+        // === MESSAGGIO WHATSAPP UNIFICATO ED COMPLETO ===
         let msg = `🍔 *Nuovo Ordine inviato a ${ristorante.nome}* %0A`;
-        msg += `👤 *Cliente:* ${nomeCliente}%0A📦 *Modalità:* ${tipo.toUpperCase()}%0A💳 *Pagamento:* ${metodoPagamento.toUpperCase()}%0A`;
-        if (tipo === "tavolo") msg += `🪑 *Tavolo:* ${tavolo}%0A`;
+        msg += `👤 *Cliente:* ${nomeCliente}%0A`;
+        msg += `📦 *Modalità:* ${tipo.toUpperCase()}%0A`;
+        msg += `💳 *Pagamento:* ${metodoPagamento.toUpperCase()}%0A`;
+        if (tipo === "tavolo") msg += `🪑 *Tavolo:* ${tavolo} (${numPersone} Persone)%0A`;
         if (tipo === "delivery") msg += `📍 *Indirizzo:* ${indirizzo}%0A`;
+        if (note) msg += `📝 *Note:* ${note}%0A`;
         
         msg += `%0A*--- PRODOTTI ---*%0A`;
         localCart.forEach(p => {
-            msg += `• *${p.nome}* x ${p.quantita}%0A`;
+            msg += `• *${p.nome}* x ${p.quantita} (€ ${(p.prezzo * p.quantita).toFixed(2)})%0A`;
             if (p.modifiche) msg += `  └ _Modifiche: ${p.modifiche}_%0A`;
         });
-        if (copertoTotale > 0) msg += `• _Coperto Sala_ = € ${copertoTotale.toFixed(2)}%0A`;
-        if (valoreSconto > 0) msg += `🎁 *Sconto:* - € ${valoreSconto.toFixed(2)}%0A`;
+        
+        if (copertoTotale > 0) msg += `• _Coperto Sala (${numPersone}x)_ = € ${copertoTotale.toFixed(2)}%0A`;
+        if (valoreSconto > 0) msg += `🎁 *Sconto (${scontoAttivo.codice}):* - € ${valoreSconto.toFixed(2)}%0A`;
         msg += `%0A*TOTALE DA CORRISPONDERE: € ${subtotale.toFixed(2)}*%0A%0A`;
         
+        // ISTRUZIONI DI RIORDINO AUTOMATIZZATO
         msg += `🔄 *Modo più semplice e veloce per ordinare di nuovo:*%0A`;
-        msg += `Salva questo numero in rubrica, scrivi *menu* e riceverai il link diretto automatico!%0A%0A`;
-        msg += `🔗 *Link diretto al menu:*%0Ahttps://zerofila.it{ristorante.slug}`;
+        msg += `Dopo aver salvato questo numero in rubrica:%0A`;
+        msg += `1. Apri *WhatsApp*%0A`;
+        msg += `2. Cerca il contatto del locale%0A`;
+        msg += `3. Scrivi *menu* in questa chat%0A`;
+        msg += `4. Il locale ti risponde in automatico con il link%0A%0A`;
+        msg += `🔗 *Link diretto al menu:*%0A`;
+        msg += `https://zerofila.it{ristorante.slug}`;
 
+        const waNumber = ristorante.telefono || "393896190004";
+        window.open(`https://wa.me{waNumber.replace(/\s+/g, '')}?text=${msg}`, "_blank");
+
+        // Pulisce il carrello locale a transazione avvenuta
         localStorage.removeItem(`zf_cart_${ristorante.id}`);
         modal.remove();
-        window.open(`https://wa.me{ristorante.telefono.replace(/\s+/g, '')}?text=${msg}`, "_blank");
         window.dispatchEvent(new Event("menuRendered"));
-    } catch (err) { alert("Errore di invio."); confirmBtn.disabled = false; }
+
+    } catch (err) {
+        console.error("Errore nell'invio:", err);
+        alert("Errore nell'invio dell'ordine.");
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = "✅ Invia Ordine";
+    }
 }
 
-const checkoutBtn = document.getElementById("send-order");
-if (checkoutBtn) checkoutBtn.addEventListener("click", () => {
-    if (getCartItems().length === 0) return alert("Carrello vuoto!");
-    showOrderModal();
+// AGGANCIO EVENTI SUL PULSANTE DI APERTURA
+window.addEventListener("DOMContentLoaded", () => {
+    const sendOrderBtn = document.getElementById("send-order");
+    if (sendOrderBtn) {
+        sendOrderBtn.addEventListener("click", () => {
+            const currentCart = getCartItems();
+            if (currentCart.length === 0) return alert("Carrello vuoto!");
+            showOrderModal();
+        });
+    }
 });
