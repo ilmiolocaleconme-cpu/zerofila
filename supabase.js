@@ -1,6 +1,6 @@
 // supabase.js - Chiave di connessione centralizzata ed isolata
-const SUPABASE_URL = "https://supabase.co";
-const SUPABASE_KEY = "sb_publishable_VjCHbi_UYBXq1dQ5E8pmwg_7JXexbfn";
+const SUPABASE_URL = "https://mllmvjaiaqdurbnqyonh.supabase.co";
+const SUPABASE_KEY = "sb_publishable_YJtWbi_UYBXqldQSE8pmmg_7JXexbfn";
 
 if (typeof supabase === 'undefined') {
     console.error("Errore Critico: SDK di Supabase non caricato nel DOM.");
