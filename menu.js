@@ -14,6 +14,8 @@ function getRistoranteSlug() {
 }
 
 async function initMenu() {
+    if (!menuContainer) return; // Protezione anti-crash se l'elemento DOM non esiste
+
     const slug = getRistoranteSlug();
     
     if (!slug) {
@@ -65,7 +67,8 @@ function renderMenu(categorie, prodotti) {
         sezioneHTML.className = "menu-section";
         
         let prodottiHTML = "";
-        prodottiDellaCategoria.forEach(prodotto => {
+        prodottoDellaCategoria.forEach(prodotto => {
+            // CORREZIONE CRITICA: Passiamo nome, prezzo e ingredienti_base nei dataset del bottone
             prodottiHTML += `
                 <div class="prodotto-card" data-id="${prodotto.id}">
                     <div class="prodotto-info">
@@ -73,7 +76,12 @@ function renderMenu(categorie, prodotti) {
                         <p>${prodotto.descrizione || ""}</p>
                         <span class="prezzo">€ ${prodotto.prezzo.toFixed(2)}</span>
                     </div>
-                    <button class="btn-add-to-cart" data-id="${prodotto.id}">➕ Aggiungi</button>
+                    <button class="btn-add-to-cart" 
+                            data-id="${prodotto.id}" 
+                            data-nome="${prodotto.nome}" 
+                            data-prezzo="${prodotto.prezzo}">
+                        ➕ Aggiungi
+                    </button>
                 </div>
             `;
         });
@@ -85,6 +93,7 @@ function renderMenu(categorie, prodotti) {
         menuContainer.appendChild(sezioneHTML);
     });
 
+    // Avvisa in modo asincrono cart.js che i bottoni sono pronti per essere cliccati
     window.dispatchEvent(new Event("menuRendered"));
 }
 
