@@ -1,11 +1,11 @@
-// order.js
+// order.js - Gestione Checkout Cliente, Convalida Coupon e Invio Ordini SaaS
 import { supabaseClient } from './supabase.js';
 import { getCartItems } from './cart.js';
 
 const COPERTO_AMOUNT = 1.50; 
 let scontoAttivo = { codice: null, valore: 0, tipo: "percentuale" };
 
-function showOrderModal() {
+export function showOrderModal() {
     const ristorante = JSON.parse(sessionStorage.getItem("zf_current_ristorante"));
     if (!ristorante) return alert("Errore SaaS: Locale non identificato.");
 
@@ -161,9 +161,11 @@ async function inviaOrdineA_Supabase(modal, ristorante) {
         }
 
         let copertoTotale = 0;
-        if (tipo === "tavolo") { copertoTotale = numPersone * COPERTO_AMOUNT; subtotale += copertoTotale; }
+        if (tipo === "tavolo") { 
+            copertoTotale = numPersone * COPERTO_AMOUNT; 
+            subtotale += copertoTotale; 
+        }
 
-        // COMPILAZIONE PAYLOAD COMPLETA E REVISIONATA SENZA TRONCAMENTI
         const ordinePayload = {
             ristorante_id: ristorante.id, 
             totale: parseFloat(subtotale.toFixed(2)), 
@@ -232,20 +234,20 @@ async function inviaOrdineA_Supabase(modal, ristorante) {
         const waNumber = ristorante.telefono || "393896190004";
         window.open(`https://wa.me{waNumber.replace(/\s+/g, '')}?text=${msg}`, "_blank");
 
-        // Pulisce il carrello locale a transazione avvenuta
+        // Pulisce il carrello locale e chiude il modulo
         localStorage.removeItem(`zf_cart_${ristorante.id}`);
         modal.remove();
         window.dispatchEvent(new Event("menuRendered"));
 
     } catch (err) {
         console.error("Errore nell'invio:", err);
-        alert("Errore nell'invio dell'ordine.");
+        alert("Errore nell'invio dell'ordine. Riprova.");
         confirmBtn.disabled = false;
         confirmBtn.textContent = "✅ Invia Ordine";
     }
 }
 
-// AGGANCIO EVENTI SUL PULSANTE DI APERTURA
+// AGGANCIO EVENTI SUL PULSANTE DI CHECKOUT PRINCIPALE DELLA PAGINA CLIENTE
 window.addEventListener("DOMContentLoaded", () => {
     const sendOrderBtn = document.getElementById("send-order");
     if (sendOrderBtn) {
