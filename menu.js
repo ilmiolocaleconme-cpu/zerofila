@@ -7,6 +7,7 @@ const restNameHeader = document.getElementById("restaurant-name");
 function getRistoranteSlug() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('r')) return urlParams.get('r');
+    
     const path = window.location.pathname;
     const parts = path.split('/').filter(p => p);
     return parts[0] || null; 
@@ -14,8 +15,9 @@ function getRistoranteSlug() {
 
 async function initMenu() {
     const slug = getRistoranteSlug();
+    
     if (!slug) {
-        menuContainer.innerHTML = "<p class='error-msg'>Nessun locale selezionato. Specifica uno slug nell'URL.</p>";
+        menuContainer.innerHTML = "<p class='error-msg'>Nessun locale selezionato. Specifica uno slug nell'URL (?r=slug).</p>";
         return;
     }
 
@@ -28,8 +30,8 @@ async function initMenu() {
 
         if (rError || !ristorante) throw new Error("Ristorante non trovato");
         
-        if (restNameHeader) restNameHeader.textContent = ristorante.nome;
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
+        if (restNameHeader) restNameHeader.textContent = ristorante.nome;
 
         const [catResponse, prodResponse] = await Promise.all([
             supabaseClient.from("categorie").select("*").eq("ristorante_id", ristorante.id).order("ordine", { ascending: true }),
@@ -40,17 +42,19 @@ async function initMenu() {
         if (prodResponse.error) throw prodResponse.error;
 
         renderMenu(catResponse.data, prodResponse.data);
+
     } catch (err) {
-        console.error(err);
+        console.error("Errore inizializzazione menu:", err);
         menuContainer.innerHTML = "<p class='error-msg'>Impossibile caricare il menu del locale.</p>";
     }
 }
 
 function renderMenu(categorie, prodotti) {
     if (categorie.length === 0) {
-        menuContainer.innerHTML = "<p class='empty-msg'>Il menu è vuoto.</p>";
+        menuContainer.innerHTML = "<p class='empty-msg'>Il menu è attualmente vuoto.</p>";
         return;
     }
+
     menuContainer.innerHTML = "";
 
     categorie.forEach(categoria => {
@@ -63,7 +67,7 @@ function renderMenu(categorie, prodotti) {
         let prodottiHTML = "";
         prodottiDellaCategoria.forEach(prodotto => {
             prodottiHTML += `
-                <div class="prodotto-card">
+                <div class="prodotto-card" data-id="${prodotto.id}">
                     <div class="prodotto-info">
                         <h3>${prodotto.nome}</h3>
                         <p>${prodotto.descrizione || ""}</p>
