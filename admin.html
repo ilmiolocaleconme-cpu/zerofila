@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroFila SaaS - Pannello Admin Locale</title>
+  
+  <!-- Collegamento allo stile grafico unificato -->
+  <link rel="stylesheet" href="style.css" />
+  
+  <style>
+    /* Estensioni di stile specifiche per la Dashboard Analitica Admin */
+    .admin-dashboard { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0 30px 0; }
+    @media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } }
+    .metric-card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; }
+    .metric-card h3 { font-size: 0.9rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
+    .metric-card p { font-size: 1.8rem; font-weight: bold; color: var(--color-pronto); }
+    
+    .report-box { background: var(--bg-card); border-radius: 14px; padding: 25px; border: 1px solid #334155; margin-bottom: 25px; }
+    .report-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
+    .select-periodo { padding: 8px 16px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    
+    .chart-container { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+    .chart-bar-row { display: flex; align-items: center; gap: 15px; font-size: 0.95rem; }
+    .chart-label { width: 110px; font-weight: 600; }
+    .chart-progress-bg { flex: 1; background: #0f172a; height: 20px; border-radius: 10px; overflow: hidden; border: 1px solid #334155; }
+    .chart-progress-fill { background: var(--color-pronto); height: 100%; width: 0%; transition: width 0.6s ease; }
+    .chart-value { width: 80px; text-align: right; font-weight: bold; }
+    
+    .btn-whatsapp-resoconto { width: 100%; padding: 14px; background-color: #00ebc7; color: #001e1d; font-weight: bold; font-size: 1.05rem; border: none; border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 10px; transition: transform 0.1s; }
+    .btn-whatsapp-resoconto:active { transform: scale(0.98); }
+  </style>
+
+  <!-- CDN SDK Supabase: Richiesta obbligatoriamente prima degli script a moduli -->
+  <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+  <!-- Testata Branding Admin -->
+  <header class="branding-header">
+    <h1 id="admin-title">📊 Resoconto Aziendale Locale</h1>
+  </header>
+
+  <main class="admin-dashboard">
+    <div class="report-box">
+      <div class="report-title-row">
+        <h2>Andamento Economico delle Vendite</h2>
+        <!-- Selettore intervallo per ricalcolare i dati al volo via JS -->
+        <select id="select-intervallo-report" class="select-periodo">
+          <option value="1">Oggi (Servizio Corrente)</option>
+          <option value="7">Ultimi 7 Giorni (Settimanale)</option>
+          <option value="30">Ultimi 30 Giorni (Mensile)</option>
+        </select>
+      </div>
+
+      <!-- Griglia delle metriche matematiche analitiche -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <h3>Fatturato Lordo</h3>
+          <p id="metric-incasso">€ 0.00</p>
+        </div>
+        <div class="metric-card">
+          <h3>Ordini Consegnati</h3>
+          <p id="metric-conteggio">0</p>
+        </div>
+        <div class="metric-card">
+          <h3>Scontrino Medio</h3>
+          <p id="metric-scontrino">€ 0.00</p>
+        </div>
+      </div>
+
+      <!-- Grafico a barre orizzontali nativo per la ripartizione dei canali di vendita -->
+      <h3 style="font-size: 1rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 15px;">Ripartizione Canali di Vendita</h3>
+      <div class="chart-container">
+        <div class="chart-bar-row">
+          <span class="chart-label">🪑 Al Tavolo (QR)</span>
+          <div class="chart-progress-bg"><div id="bar-tavolo" class="chart-progress-fill"></div></div>
+          <span id="val-tavolo" class="chart-value">€ 0.00</span>
+        </div>
+        <div class="chart-bar-row">
+          <span class="chart-label">📦 Asporto</span>
+          <div class="chart-progress-bg"><div id="bar-asporto" class="chart-progress-fill" style="background: var(--color-preparazione);"></div></div>
+          <span id="val-asporto" class="chart-value">€ 0.00</span>
+        </div>
+        <div class="chart-bar-row">
+          <span class="chart-label">🚀 Delivery</span>
+          <div class="chart-progress-bg"><div id="bar-delivery" class="chart-progress-fill" style="background: var(--color-ricevuto);"></div></div>
+          <span id="val-delivery" class="chart-value">€ 0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottone logistico per spingere la chiusura direttamente su WhatsApp -->
+    <button type="button" id="btn-chiusura-whatsapp" class="btn-whatsapp-resoconto">
+      📲 Invia Chiusura di Cassa su WhatsApp
+    </button>
+  </main>
+
+  <!-- Script Modulare Core che collega la logica di calcolo di admin.js con il DOM di questa pagina -->
+  <script type="module">
+    import { generaReportVendite, inviaRiepilogoWhatsAppTitolare } from './admin.js';
+    import { supabaseClient } from './supabase.js';
+
+    const selectPeriodo = document.getElementById("select-intervallo-report");
+    const btnWhatsApp = document.getElementById("btn-chiusura-whatsapp");
+
+    /**
+     * Esegue la query asincrona tramite admin.js e aggiorna i contatori ed i grafici a schermo
+     */
+    async function rinfrescaDashboardAnalitica() {
+        const giorniSelezionati = parseInt(selectPeriodo.value);
+        const report = await generaReportVendite(giorniSelezionati);
+
+        if (!report) {
+            alert("Impossibile calcolare il report. Verifica che lo slug del ristorante sia presente in sessione.");
+            return;
+        }
+
+        // 1. Aggiornamento dei testi delle metriche core
+        document.getElementById("metric-incasso").textContent = `€ ${report.totaleIncassato.toFixed(2)}`;
+        document.getElementById("metric-conteggio").textContent = report.conteggio;
+        document.getElementById("metric-scontrino").textContent = `€ ${report.scontrinoMedio.toFixed(2)}`;
+
+        // 2. Aggiornamento dei valori testuali del grafico canali
+        document.getElementById("val-tavolo").textContent = `€ ${report.dettaglioCanali.tavolo.toFixed(2)}`;
+        document.getElementById("val-asporto").textContent = `€ ${report.dettaglioCanali.asporto.toFixed(2)}`;
+        document.getElementById("val-delivery").textContent = `€ ${report.dettaglioCanali.delivery.toFixed(2)}`;
+
+        // 3. Calcolo percentuale e rendering grafico delle barre dinamiche
+        const maxVal = Math.max(report.dettaglioCanali.tavolo, report.dettaglioCanali.asporto, report.dettaglioCanali.delivery, 1);
+        
+        document.getElementById("bar-tavolo").style.width = `${(report.dettaglioCanali.tavolo / maxVal) * 100}%`;
+        document.getElementById("bar-asporto").style.width = `${(report.dettaglioCanali.asporto / maxVal) * 100}%`;
+        document.getElementById("bar-delivery").style.width = `${(report.dettaglioCanali.delivery / maxVal) * 100}%`;
+    }
+
+    /**
+     * Inizializzazione della pagina agganciando lo slug del locale dall'URL per l'isolamento SaaS
+     */
+    async function initAdminPage() {
+        // Legge lo slug dall'URL (es: ?r=al-panetto) per rintracciare il ristorante corretto nel SaaS
+        const urlParams = new URLSearchParams(window.location.search);
+        const slug = urlParams.get('r');
+
+        if (!slug) {
+            document.body.innerHTML = "<p class='error-msg' style='margin-top:50px;'>Errore SaaS: URL non valido. Specifica lo slug del locale (?r=slug).</p>";
+            return;
+        }
+
+        try {
+            const { data: ristorante, error } = await supabaseClient
+                .from("ristoranti")
+                .select("*")
+                .eq("slug", slug)
+                .single();
+
+            if (error || !ristorante) throw new Error();
+            
+            // Salva nel sessionStorage per renderlo leggibile ad admin.js
+            sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
+            document.getElementById("admin-title").textContent = `📊 Pannello Amministrativo - ${ristorante.nome}`;
+            
+            // Esegue il primo caricamento analitico dei dati
+            await rinfrescaDashboardAnalitica();
+        } catch (err) {
+            document.body.innerHTML = "<p class='error-msg' style='margin-top:50px;'>Locale non registrato sulla piattaforma ZeroFila.</p>";
+        }
+    }
+
+    // Event Listeners dei bottoni e dei filtri temporali
+    selectPeriodo.addEventListener("change", rinfrescaDashboardAnalitica);
+    btnWhatsApp.addEventListener("click", inviaRiepilogoWhatsAppTitolare);
+
+    // Esegui avvio
+    initAdminPage();
+  </script>
+
+</body>
+</html>
