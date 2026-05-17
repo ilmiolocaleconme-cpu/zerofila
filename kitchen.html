@@ -1,42 +1,19 @@
 <!DOCTYPE html>
 <html lang="it">
-
 <head>
   <meta charset="UTF-8" />
-
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0" />
-
-  <title>Cucina ZeroFila</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroFila - Dashboard Cucina</title>
   <link rel="stylesheet" href="style.css" />
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://jsdelivr.net"></script>
 </head>
-
 <body>
-
-  <button id="enable-audio">
-  Attiva Audio
-  </button>
-
-  <header class="header">
-    <h1>🍔 Dashboard Cucina</h1>
-  </header>
-
-  <main id="kitchen-orders">
-
-    <p>Caricamento ordini...</p>
-
-  </main>
-
-  <script src="supabase.js"></script>
-  <script src="kitchen.js"></script>
-  
-  <audio
-  id="new-order-sound"
-  src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"
-></audio>
-  
+  <header class="header"><h1 id="kitchen-title">🍔 Dashboard Cucina</h1></header>
+  <div class="controls-bar">
+    <button id="enable-audio">🔊 ATTIVA AUDIO</button>
+    <audio id="new-order-sound" preload="auto"></audio>
+  </div>
+  <main id="kitchen-orders"><p class="loading-state">Connessione al sistema...</p></main>
+  <script type="module" src="kitchen.js"></script>
 </body>
 </html>
