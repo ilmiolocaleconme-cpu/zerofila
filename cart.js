@@ -1,26 +1,35 @@
 // cart.js
-import { supabaseClient } from './supabase.js';
+import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
 
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 
-let piattoInPersonalizzazione = null;
-
 function getStorageKey() {
-    const ristorante = JSON.parse(sessionStorage.getItem("zf_current_ristorante"));
-    return ristorante ? `zf_cart_${ristorante.id}` : "zf_cart_generic";
+    try {
+        const data = sessionStorage.getItem("zf_current_ristorante");
+        if (!data) return "zf_cart_generic";
+        const r = JSON.parse(data);
+        return r?.id ? `zf_cart_${r.id}` : "zf_cart_generic";
+    } catch (e) {
+        return "zf_cart_generic";
+    }
 }
 
 export function getCartItems() {
-    const saved = localStorage.getItem(getStorageKey());
+    const key = getStorageKey();
+    const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : [];
+}
+
+export function saveCart(cart) {
+    localStorage.setItem(getStorageKey(), JSON.stringify(cart || []));
 }
 
 export function renderCart() {
     if (!cartContainer) return;
-    const localCart = getCartItems();
+    const cart = getCartItems();
 
-    if (localCart.length === 0) {
+    if (cart.length === 0) {
         cartContainer.innerHTML = "<p class='cart-empty'>Il carrello è vuoto</p>";
         if (cartTotalElement) cartTotalElement.textContent = "€ 0.00";
         return;
@@ -29,195 +38,23 @@ export function renderCart() {
     cartContainer.innerHTML = "";
     let totale = 0;
 
-    localCart.forEach(item => {
-        totale += item.prezzo * item.quantita;
-        const itemHTML = document.createElement("div");
-        itemHTML.className = "cart-item";
-        itemHTML.innerHTML = `
-            <div class="cart-item-row">
-                <span class="item-nome">${item.nome}</span>
-                <div class="item-controlli">
-                    <button class="btn-cart-meno" data-cid="${item.carrelloId}">-</button>
-                    <span class="item-quantita">${item.quantita}</span>
-                    <button class="btn-cart-piu" data-cid="${item.carrelloId}">+</button>
-                </div>
-                <span class="item-prezzo">€ ${(item.prezzo * item.quantita).toFixed(2)}</span>
+    cart.forEach(item => {
+        totale += Number(item.prezzo) * item.quantita;
+        const div = document.createElement("div");
+        div.className = "cart-item";
+        div.innerHTML = `
+            <span class="item-nome">${escapeHtml(item.nome)}</span>
+            <div class="item-controlli">
+                <button class="btn-cart-meno" data-cid="${item.carrelloId}">-</button>
+                <span class="item-quantita">${item.quantita}</span>
+                <button class="btn-cart-piu" data-cid="${item.carrelloId}">+</button>
             </div>
-            ${item.modifiche ? `<div class="cart-item-modifiche">⚠️ Modifiche: ${item.modifiche}</div>` : ''}
+            <span class="item-prezzo">€ ${formatPrice(item.prezzo * item.quantita)}</span>
         `;
-        cartContainer.appendChild(itemHTML);
+        cartContainer.appendChild(div);
     });
 
-    if (cartTotalElement) cartTotalElement.textContent = `€ ${totale.toFixed(2)}`;
-    agganciaControlliCarrello();
+    if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
 }
 
-function modificaQuantita(carrelloId, azione) {
-    let localCart = getCartItems();
-    const item = localCart.find(i => i.carrelloId === carrelloId);
-    if (!item) return;
-
-    if (azione === "piu") {
-        item.quantita++;
-    } else if (azione === "meno") {
-        item.quantita--;
-        if (item.quantita <= 0) {
-            localCart = localCart.filter(i => i.carrelloId !== carrelloId);
-        }
-    }
-    localStorage.setItem(getStorageKey(), JSON.stringify(localCart));
-    renderCart();
-}
-
-function agganciaControlliCarrello() {
-    if (!cartContainer) return;
-    cartContainer.querySelectorAll(".btn-cart-piu").forEach(b => b.onclick = (e) => modificaQuantita(e.target.dataset.cid, "piu"));
-    cartContainer.querySelectorAll(".btn-cart-meno").forEach(b => b.onclick = (e) => modificaQuantita(e.target.dataset.cid, "meno"));
-}
-
-async function apriModalPersonalizzazione(prodottoId) {
-    const ristorante = JSON.parse(sessionStorage.getItem("zf_current_ristorante"));
-    if (!ristorante) return;
-    
-    try {
-        const [prodRes, extraRes] = await Promise.all([
-            supabaseClient.from("prodotti").select("*").eq("id", prodottoId).single(),
-            supabaseClient.from("ingredienti_extra").select("*").eq("ristorante_id", ristorante.id)
-        ]);
-
-        if (prodRes.error) throw prodRes.error;
-        const prodotto = prodRes.data;
-        const tuttiExtra = extraRes.data || [];
-
-        piattoInPersonalizzazione = {
-            id: prodotto.id, 
-            nome: prodotto.nome, 
-            prezzoBase: prodotto.prezzo, 
-            prezzoFinale: prodotto.prezzo, 
-            rimossi: [], 
-            aggiunti: []
-        };
-
-        let ingredientiBaseHTML = "";
-        if (prodotto.ingredienti_base && prodotto.ingredienti_base.length > 0) {
-            prodotto.ingredienti_base.forEach(ing => {
-                ingredientiBaseHTML += `
-                    <label class="custom-chk-label" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-                        <input type="checkbox" class="chk-ingrediente-base" data-ingrediente="${ing}" checked style="width:auto; margin:0;">
-                        <span>${ing}</span>
-                    </label>
-                `;
-            });
-        } else { 
-            ingredientiBaseHTML = "<p style='color:var(--text-muted); font-style:italic;'>Nessun ingrediente base.</p>"; 
-        }
-
-        let ingredientiExtraHTML = "";
-        if (tuttiExtra.length > 0) {
-            tuttiExtra.forEach(ext => {
-                ingredientiExtraHTML += `
-                    <label class="custom-chk-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <input type="checkbox" class="chk-ingrediente-extra" data-nome="${ext.nome}" data-prezzo="${ext.prezzo_supplemento}" style="width:auto; margin:0;">
-                            <span>+ ${ext.nome}</span>
-                        </div>
-                        <span style="color:var(--color-pronto); font-weight:bold;">+ € ${ext.prezzo_supplemento.toFixed(2)}</span>
-                    </label>
-                `;
-            });
-        } else { 
-            ingredientiExtraHTML = "<p style='color:var(--text-muted); font-style:italic;'>Nessun ingrediente extra.</p>"; 
-        }
-
-        const modalHTML = `
-        <div id="custom-pizza-modal" class="modal" style="z-index:10000;">
-          <div class="modal-content" style="max-width:400px;">
-            <h3 style="color:var(--color-pronto); margin-bottom:15px; text-align:center;">${prodotto.nome}</h3>
-            <div style="margin-bottom:15px; max-height:180px; overflow-y:auto;">
-                <h4>Modifica Ingredienti</h4>
-                ${ingredientiBaseHTML}
-            </div>
-            <div style="margin-bottom:20px; max-height:180px; overflow-y:auto; border-top:1px dashed #334155; padding-top:15px;">
-                <h4>Aggiungi Extra</h4>
-                ${ingredientiExtraHTML}
-            </div>
-            <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:8px; display:flex; justify-content:space-between; font-weight:bold; margin-bottom:15px;">
-                <span>Totale Piatto:</span><span id="custom-plate-price">€ ${prodotto.prezzo.toFixed(2)}</span>
-            </div>
-            <div class="modal-buttons">
-                <button type="button" id="btn-custom-cancel">Annulla</button>
-                <button type="button" id="btn-custom-confirm">🛒 Inserisci</button>
-            </div>
-          </div>
-        </div>`;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        const modal = document.getElementById("custom-pizza-modal");
-        const baseCheckboxes = modal.querySelectorAll(".chk-ingrediente-base");
-        const extraCheckboxes = modal.querySelectorAll(".chk-ingrediente-extra");
-
-        function ricalcolaPrezzoPiatto() {
-            let extraTotale = 0;
-            piattoInPersonalizzazione.rimossi = [];
-            piattoInPersonalizzazione.aggiunti = [];
-
-            baseCheckboxes.forEach(cb => { if (!cb.checked) piattoInPersonalizzazione.rimossi.push(cb.dataset.ingrediente); });
-            extraCheckboxes.forEach(cb => {
-                if (cb.checked) {
-                    const pr = parseFloat(cb.dataset.prezzo);
-                    extraTotale += pr;
-                    piattoInPersonalizzazione.aggiunti.push({ nome: cb.dataset.nome, prezzo: pr });
-                }
-            });
-
-            piattoInPersonalizzazione.prezzoFinale = piattoInPersonalizzazione.prezzoBase + extraTotale;
-            document.getElementById("custom-plate-price").textContent = `€ ${piattoInPersonalizzazione.prezzoFinale.toFixed(2)}`;
-        }
-
-        baseCheckboxes.forEach(cb => cb.onchange = ricalcolaPrezzoPiatto);
-        extraCheckboxes.forEach(cb => cb.onchange = ricalcolaPrezzoPiatto);
-        
-        document.getElementById("btn-custom-cancel").onclick = () => modal.remove();
-        document.getElementById("btn-custom-confirm").onclick = () => {
-            let rimozioni = piattoInPersonalizzazione.rimossi.map(ing => `-${ing}`);
-            let aggiunte = piattoInPersonalizzazione.aggiunti.map(ext => `+${ext.nome}`);
-            let stringaModifiche = [...rimozioni, ...aggiunte].join(", ");
-
-            // CORREZIONE BUG FINALE DI TRONCAMENTO: Generazione ID univoco basato sulle modifiche btoa
-            const carrelloId = `${piattoInPersonalizzazione.id}_${btoa(unescape(encodeURIComponent(stringaModifiche)))}`;
-            let localCart = getCartItems();
-
-            const itemEsistente = localCart.find(i => i.carrelloId === carrelloId);
-            if (itemEsistente) {
-                itemEsistente.quantita++;
-            } else {
-                localCart.push({
-                    carrelloId: carrelloId,
-                    id: piattoInPersonalizzazione.id,
-                    nome: piattoInPersonalizzazione.nome,
-                    prezzo: piattoInPersonalizzazione.prezzoFinale,
-                    quantita: 1,
-                    modifiche: stringaModifiche || null
-                });
-            }
-
-            localStorage.setItem(getStorageKey(), JSON.stringify(localCart));
-            modal.remove();
-            renderCart();
-        };
-
-    } catch (err) {
-        console.error("Errore nell'apertura personalizzazione:", err);
-    }
-}
-
-// ASCOLTATORE EVENTI CORE: Intercetta i click sui bottoni di aggiunta emessi da menu.js
-window.addEventListener("menuRendered", () => {
-    renderCart(); // Esegue il primo rendering visivo appena la pagina è pronta
-    document.querySelectorAll(".btn-add-to-cart").forEach(button => {
-        button.onclick = (e) => {
-            const prodottoId = e.target.dataset.id;
-            apriModalPersonalizzazione(prodottoId);
-        };
-    });
-});
+window.addEventListener("menuRendered", renderCart);
