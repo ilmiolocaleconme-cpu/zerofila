@@ -5,6 +5,7 @@ const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 const TARGET_SLUG = "al-panetto";
 
+// --- FUNZIONI CARRELLO ESPORTATE ---
 export function getCartItems() {
     const saved = localStorage.getItem(`zf_cart_${TARGET_SLUG}`);
     return saved ? JSON.parse(saved) : [];
@@ -46,6 +47,7 @@ export function renderCart() {
     if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
 }
 
+// --- LOGICA DI INVIO ORDINE E MODAL ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -66,7 +68,7 @@ function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
 
-    // Recupero dei dati precedentemente salvati per il cliente (Funzionalità Richiesta)
+    // Recupero automatico dei dati cliente salvati in precedenza
     const salvatoNome = localStorage.getItem("zf_user_nome") || "";
     const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
 
@@ -85,7 +87,7 @@ function showOrderModal(ristorante) {
           <option value="delivery">🚀 Delivery</option>
         </select>
 
-        <!-- Mostra o nasconde i campi dinamicamente basandosi sulla modalità selezionata (Funzionalità Richiesta) -->
+        <!-- Sezioni condizionali: mostrate o nascoste in base alla scelta del cliente -->
         <div id="tavolo-fields" style="display: ${tavoloDalQR || !tavoloDalQR ? 'block' : 'none'};">
           <label>N° Tavolo <span class="required">*</span></label>
           <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
@@ -114,14 +116,13 @@ function showOrderModal(ristorante) {
 
     const tipoSelect = modal.querySelector("#tipo-ordine");
     
-    // Funzione interna per mostrare solo i dati strettamente necessari
+    // Mostra solo i campi strettamente necessari in base alla modalità di consegna
     const aggiornaCampiVisibili = () => {
         const val = tipoSelect.value;
         document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
         document.getElementById("delivery-fields").style.display = val === "delivery" ? "block" : "none";
     };
 
-    // Esegui subito all'apertura e aggancia l'evento al cambio modalità
     aggiornaCampiVisibili();
     tipoSelect.addEventListener("change", aggiornaCampiVisibili);
 
@@ -149,13 +150,13 @@ async function elaboraInvioComanda(modal, ristorante) {
         if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
 
-        // SALVATAGGIO DEI DATI CLIENTE SULLO STORAGE LOCALE PER IL PROSSIMO ACCESSO
+        // Memorizzazione persistente dei dati anagrafici sul telefono del cliente
         localStorage.setItem("zf_user_nome", nome);
         localStorage.setItem("zf_user_telefono", telefono);
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio record comanda su Supabase
+        // 1. Inserimento record comanda su Supabase per lo schermo della cucina
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -183,20 +184,28 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Importazione dinamica del file messaggi
+        // 2. Importazione asincrona e pulita del file dei messaggi
         const moduloMessaggi = await import(`./messaggi.js?t=${Date.now()}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
         const numeroLocale = (ristorante.telefono || "393896190004").replace(/\s+/g, '');
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
 
+        // Svuota il carrello e chiude la modale grafica
         saveCart([]);
         modal.remove();
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. Spostamento diretto verso le API ufficiali di WhatsApp (Sintassi corretta e testata)
-        window.location.href = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
+        // 3. GENERAZIONE ED APERTURA LINK CON CLICK DIRETTO (Bypassa le protezioni del telefono)
+        const linkWhatsApp = document.createElement("a");
+        linkWhatsApp.href = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
+        linkWhatsApp.target = "_top";
+        linkWhatsApp.rel = "noopener noreferrer";
+        
+        document.body.appendChild(linkWhatsApp);
+        linkWhatsApp.click();
+        document.body.removeChild(linkWhatsApp);
 
     } catch (err) {
         console.error(err);
@@ -209,6 +218,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
+// --- CAPTURING EVENTI CLICK INTERFACCIA CARRELLO ---
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
