@@ -1,6 +1,5 @@
-// kitchen.js
 import { supabaseClient } from './supabase.js';
-import { getRistoranteSlug, escapeHtml } from './utils.js';
+import { getRistoranteSlug, escapeHtml, showToast } from './utils.js';
 
 const kitchenContainer = document.getElementById("kitchen-orders");
 const enableAudioBtn = document.getElementById("enable-audio");
@@ -12,7 +11,7 @@ const audioPlayer = new Audio();
 audioPlayer.volume = 0.85;
 
 function playNewOrderSound() {
-    audioPlayer.src = "https://assets.mixkit.co/sfx/preview/2967/2967.wav";
+    audioPlayer.src = "https://mixkit.co";
     audioPlayer.play().catch(() => {});
 }
 
@@ -61,7 +60,7 @@ function renderKitchenOrders(ordini) {
 
         const section = document.createElement("div");
         section.className = "kitchen-section";
-        section.innerHTML = `<h2 class="section-title">\( {stato.toUpperCase()} ( \){lista.length})</h2>`;
+        section.innerHTML = `<h2 class="section-title">${stato.toUpperCase()} (${lista.length})</h2>`;
 
         const grid = document.createElement("div");
         grid.className = "orders-grid";
