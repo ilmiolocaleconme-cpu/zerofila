@@ -200,6 +200,7 @@ async function elaboraInvioComanda(modal, ristorante) {
         // 3. Reindirizzamento ed invio su WhatsApp Web / App
         window.open(`https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`, "_blank");
 
+
     } catch (err) {
         console.error(err);
         showToast(err.message, "error");
