@@ -51,7 +51,7 @@ export function renderCart() {
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
-        // Rimuove eventuali listener precedenti per evitare attivazioni doppie
+        // Rimuove eventuali listener precedenti per evitare attivazioni doppie causate da re-render
         btnProcedi.replaceWith(btnProcedi.cloneNode(true));
         const newBtnProcedi = document.getElementById("send-order");
         
@@ -142,7 +142,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio record comanda su Supabase
+        // 1. Salvataggio record comanda su Supabase per lo schermo cucina
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -161,7 +161,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
-        // Inserimento prodotti correlati su Supabase
+        // Inserimento dettagli prodotti correlati su Supabase
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -187,17 +187,19 @@ async function elaboraInvioComanda(modal, ristorante) {
         msg += `💰 *TOTALE DA PAGARE:* € ${subtotale.toFixed(2)}\n\n`;
         msg += `Ordinato tramite *ZeroFila* 🍔`;
 
+        // Estrazione e formattazione del numero telefonico del ristorante
         const numeroLocale = (ristorante.telefono || "393896190004").replace(/\s+/g, '');
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
 
-        // Pulizia dello stato locale prima del redirect
+        // Svuota lo storage del carrello e aggiorna la sidebar
         saveCart([]);
         modal.remove();
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. APERTURA CHAT WHATSAPP CORRETTA CORRETTA (Sistemata)
-        window.open(`https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`, "_blank");
+        // 3. REINDIRIZZAMENTO DIRETTO (Aggira definitivamente il blocco pop-up sui telefoni)
+        const urlWhatsApp = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
+        window.location.href = urlWhatsApp;
 
     } catch (err) {
         console.error(err);
@@ -210,7 +212,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// --- CAPTURING EVENTI CLICK INTERFACCIA SIDEBAR ---
+// --- CAPTURING EVENTI CLICK CONTROLLI QUANTITÀ SIDEBAR ---
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
