@@ -1,58 +1,13 @@
 import { supabaseClient } from './supabase.js';
 import { escapeHtml, formatPrice, showToast } from './utils.js';
+import { initOrderLogic, getCartItems, saveCart, renderCart } from './order.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
-const cartContainer = document.getElementById("cart-items");
-const cartTotalElement = document.getElementById("cart-total");
 
-// Costanti fisse per sbloccare il sistema
+// Costante fissa SaaS per il locale corrente
 const TARGET_SLUG = "al-panetto";
-const COPERTO_AMOUNT = 1.50;
 
-// --- GESTIONE CARRELLO (INTEGRATA) ---
-function getCartItems() {
-    const saved = localStorage.getItem(`zf_cart_${TARGET_SLUG}`);
-    return saved ? JSON.parse(saved) : [];
-}
-
-function saveCart(cart) {
-    localStorage.setItem(`zf_cart_${TARGET_SLUG}`, JSON.stringify(cart || []));
-}
-
-function renderCart() {
-    if (!cartContainer) return;
-    const cart = getCartItems();
-
-    if (cart.length === 0) {
-        cartContainer.innerHTML = "<p class='cart-empty'>Il carrello è vuoto</p>";
-        if (cartTotalElement) cartTotalElement.textContent = "€ 0.00";
-        return;
-    }
-
-    cartContainer.innerHTML = "";
-    let totale = 0;
-
-    cart.forEach(item => {
-        totale += Number(item.prezzo) * item.quantita;
-        const div = document.createElement("div");
-        div.className = "cart-item";
-        div.innerHTML = `
-            <span class="item-nome">${escapeHtml(item.nome)}</span>
-            <div class="item-controlli">
-                <button class="btn-cart-meno" data-cid="${item.carrelloId}">-</button>
-                <span class="item-quantita">${item.quantita}</span>
-                <button class="btn-cart-piu" data-cid="${item.carrelloId}">+</button>
-            </div>
-            <span class="item-prezzo">€ ${formatPrice(item.prezzo * item.quantita)}</span>
-        `;
-        cartContainer.appendChild(div);
-    });
-
-    if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
-}
-
-// --- LOGICA REALE DI INIZIALIZZAZIONE ---
 async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -119,8 +74,9 @@ async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Forza il rendering del carrello subito dopo i prodotti
+        // Inizializza il carrello e la logica degli ordini passando i dati del ristorante
         renderCart();
+        initOrderLogic(ristorante);
 
     } catch (err) {
         console.error(err);
@@ -128,9 +84,8 @@ async function initMenu() {
     }
 }
 
-// --- CAPTURING EVENTI CLICK (INTERVALLO UNIFICATO) ---
+// --- CAPTURING EVENTI CLICK PRODOTTI ---
 document.addEventListener("click", (e) => {
-    // 1. Aggiungi prodotto
     if (e.target.classList.contains("btn-add-to-cart")) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
@@ -154,35 +109,7 @@ document.addEventListener("click", (e) => {
         renderCart();
         showToast(`Aggiunto: ${nome}`);
     }
-
-    // 2. Tasto Più (+)
-    if (e.target.classList.contains("btn-cart-piu")) {
-        const cid = e.target.getAttribute("data-cid");
-        let cart = getCartItems();
-        const item = cart.find(i => i.carrelloId === cid);
-        if (item) {
-            item.quantita += 1;
-            saveCart(cart);
-            renderCart();
-        }
-    }
-
-    // 3. Tasto Meno (-)
-    if (e.target.classList.contains("btn-cart-meno")) {
-        const cid = e.target.getAttribute("data-cid");
-        let cart = getCartItems();
-        const itemIndex = cart.findIndex(i => i.carrelloId === cid);
-        if (itemIndex !== -1) {
-            if (cart[itemIndex].quantita > 1) {
-                cart[itemIndex].quantita -= 1;
-            } else {
-                cart.splice(itemIndex, 1);
-            }
-            saveCart(cart);
-            renderCart();
-        }
-    }
 });
 
-// Avvio istantaneo controllato
+// Avvio esecuzione dell'app
 initMenu();
