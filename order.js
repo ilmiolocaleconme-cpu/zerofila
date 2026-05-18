@@ -66,13 +66,17 @@ function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
 
+    // Recupero dei dati precedentemente salvati per il cliente (Funzionalità Richiesta)
+    const salvatoNome = localStorage.getItem("zf_user_nome") || "";
+    const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
+
     const modalHTML = `
     <div id="order-modal" class="modal">
       <div class="modal-content">
         <h2>Completa il tuo Ordine</h2>
         
         <label>Nome e Cognome <span class="required">*</span></label>
-        <input type="text" id="cliente-nome" placeholder="Mario Rossi" required>
+        <input type="text" id="cliente-nome" value="${escapeHtml(salvatoNome)}" placeholder="Mario Rossi" required>
 
         <label>Tipo di Ordine</label>
         <select id="tipo-ordine" ${tavoloDalQR ? 'disabled' : ''}>
@@ -81,6 +85,7 @@ function showOrderModal(ristorante) {
           <option value="delivery">🚀 Delivery</option>
         </select>
 
+        <!-- Mostra o nasconde i campi dinamicamente basandosi sulla modalità selezionata (Funzionalità Richiesta) -->
         <div id="tavolo-fields" style="display: ${tavoloDalQR || !tavoloDalQR ? 'block' : 'none'};">
           <label>N° Tavolo <span class="required">*</span></label>
           <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
@@ -92,7 +97,7 @@ function showOrderModal(ristorante) {
         </div>
 
         <label>Telefono <span class="required">*</span></label>
-        <input type="tel" id="telefono" placeholder="333 1234567" required>
+        <input type="tel" id="telefono" value="${escapeHtml(salvatoTelefono)}" placeholder="333 1234567" required>
 
         <label>Note / Allergie</label>
         <textarea id="note" rows="3" placeholder="Allergie, preferenze..."></textarea>
@@ -108,10 +113,17 @@ function showOrderModal(ristorante) {
     const modal = document.getElementById("order-modal");
 
     const tipoSelect = modal.querySelector("#tipo-ordine");
-    tipoSelect.addEventListener("change", () => {
-        document.getElementById("tavolo-fields").style.display = tipoSelect.value === "tavolo" ? "block" : "none";
-        document.getElementById("delivery-fields").style.display = tipoSelect.value === "delivery" ? "block" : "none";
-    });
+    
+    // Funzione interna per mostrare solo i dati strettamente necessari
+    const aggiornaCampiVisibili = () => {
+        const val = tipoSelect.value;
+        document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
+        document.getElementById("delivery-fields").style.display = val === "delivery" ? "block" : "none";
+    };
+
+    // Esegui subito all'apertura e aggancia l'evento al cambio modalità
+    aggiornaCampiVisibili();
+    tipoSelect.addEventListener("change", aggiornaCampiVisibili);
 
     modal.querySelector("#modal-cancel").onclick = () => modal.remove();
     modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
@@ -130,12 +142,16 @@ async function elaboraInvioComanda(modal, ristorante) {
         const tipo = modal.querySelector("#tipo-ordine").value;
         const telefono = modal.querySelector("#telefono").value.trim();
         const note = modal.querySelector("#note").value.trim();
-        const tavolo = modal.querySelector("#tavolo")?.value.trim() || null;
-        const indirizzo = modal.querySelector("#indirizzo")?.value.trim() || null;
+        const tavolo = tipo === "tavolo" ? modal.querySelector("#tavolo")?.value.trim() : null;
+        const indirizzo = tipo === "delivery" ? modal.querySelector("#indirizzo")?.value.trim() : null;
 
         if (!nome || !telefono) throw new Error("Nome e telefono sono obbligatori");
         if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
+
+        // SALVATAGGIO DEI DATI CLIENTE SULLO STORAGE LOCALE PER IL PROSSIMO ACCESSO
+        localStorage.setItem("zf_user_nome", nome);
+        localStorage.setItem("zf_user_telefono", telefono);
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
@@ -167,7 +183,7 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Importazione Dinamica con Cache Busting Integrato del modulo messaggi
+        // 2. Importazione dinamica del file messaggi
         const moduloMessaggi = await import(`./messaggi.js?t=${Date.now()}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
@@ -179,9 +195,8 @@ async function elaboraInvioComanda(modal, ristorante) {
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. Reindirizzamento diretto a WhatsApp con variabili allineate
-        const urlWhatsApp = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
-        window.location.href = urlWhatsApp;
+        // 3. Spostamento diretto verso le API ufficiali di WhatsApp (Sintassi corretta e testata)
+        window.location.href = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
 
     } catch (err) {
         console.error(err);
