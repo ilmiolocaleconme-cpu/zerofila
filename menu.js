@@ -1,99 +1,82 @@
 // menu.js
 import { supabaseClient } from './supabase.js';
+import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
 
-function getRistoranteSlug() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('r')) return urlParams.get('r');
-    
-    const path = window.location.pathname;
-    const parts = path.split('/').filter(p => p);
-    return parts[0] || null; 
-}
-
 async function initMenu() {
-    if (!menuContainer) return; // Protezione anti-crash se l'elemento DOM non esiste
-
+    if (!menuContainer) return;
     const slug = getRistoranteSlug();
-    
     if (!slug) {
-        menuContainer.innerHTML = "<p class='error-msg'>Nessun locale selezionato. Specifica uno slug nell'URL (?r=slug).</p>";
+        menuContainer.innerHTML = `<p class="error-msg">Nessun locale selezionato.</p>`;
         return;
     }
 
+    menuContainer.innerHTML = `<div class="loading-container"><div class="loading-spinner"></div><p>Caricamento menu...</p></div>`;
+
     try {
-        const { data: ristorante, error: rError } = await supabaseClient
+        const { data: ristorante, error } = await supabaseClient
             .from("ristoranti")
             .select("*")
             .eq("slug", slug)
             .single();
 
-        if (rError || !ristorante) throw new Error("Ristorante non trovato");
-        
+        if (error || !ristorante) throw new Error("Ristorante non trovato");
+
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
         if (restNameHeader) restNameHeader.textContent = ristorante.nome;
 
-        const [catResponse, prodResponse] = await Promise.all([
+        const [catRes, prodRes] = await Promise.all([
             supabaseClient.from("categorie").select("*").eq("ristorante_id", ristorante.id).order("ordine", { ascending: true }),
             supabaseClient.from("prodotti").select("*").eq("ristorante_id", ristorante.id).eq("disponibile", true).order("ordine", { ascending: true })
         ]);
 
-        if (catResponse.error) throw catResponse.error;
-        if (prodResponse.error) throw prodResponse.error;
-
-        renderMenu(catResponse.data, prodResponse.data);
-
+        renderMenu(catRes.data || [], prodRes.data || []);
     } catch (err) {
-        console.error("Errore inizializzazione menu:", err);
-        menuContainer.innerHTML = "<p class='error-msg'>Impossibile caricare il menu del locale.</p>";
+        console.error(err);
+        menuContainer.innerHTML = `<p class="error-msg">Impossibile caricare il menu.</p>`;
     }
 }
 
 function renderMenu(categorie, prodotti) {
-    if (categorie.length === 0) {
-        menuContainer.innerHTML = "<p class='empty-msg'>Il menu è attualmente vuoto.</p>";
+    if (!menuContainer) return;
+    menuContainer.innerHTML = "";
+
+    if (!categorie.length) {
+        menuContainer.innerHTML = `<p class="empty-msg">Il menu è attualmente vuoto.</p>`;
         return;
     }
 
-    menuContainer.innerHTML = "";
+    categorie.forEach(cat => {
+        const prods = prodotti.filter(p => p.categoria_id === cat.id);
+        if (!prods.length) return;
 
-    categorie.forEach(categoria => {
-        const prodottiDellaCategoria = prodotti.filter(p => p.categoria_id === categoria.id);
-        if (prodottiDellaCategoria.length === 0) return;
+        const section = document.createElement("section");
+        section.className = "menu-section";
+        section.innerHTML = `<h2 class="categoria-titolo">${escapeHtml(cat.nome)}</h2>`;
 
-        const sezioneHTML = document.createElement("section");
-        sezioneHTML.className = "menu-section";
-        
-        let prodottiHTML = "";
-        prodottoDellaCategoria.forEach(prodotto => {
-            // CORREZIONE CRITICA: Passiamo nome, prezzo e ingredienti_base nei dataset del bottone
-            prodottiHTML += `
-                <div class="prodotto-card" data-id="${prodotto.id}">
-                    <div class="prodotto-info">
-                        <h3>${prodotto.nome}</h3>
-                        <p>${prodotto.descrizione || ""}</p>
-                        <span class="prezzo">€ ${prodotto.prezzo.toFixed(2)}</span>
-                    </div>
-                    <button class="btn-add-to-cart" 
-                            data-id="${prodotto.id}" 
-                            data-nome="${prodotto.nome}" 
-                            data-prezzo="${prodotto.prezzo}">
-                        ➕ Aggiungi
-                    </button>
+        const grid = document.createElement("div");
+        grid.className = "prodotti-grid";
+
+        prods.forEach(p => {
+            const card = document.createElement("div");
+            card.className = "prodotto-card";
+            card.innerHTML = `
+                <div class="prodotto-info">
+                    <h3>${escapeHtml(p.nome)}</h3>
+                    <p>${escapeHtml(p.descrizione || '')}</p>
+                    <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                 </div>
+                <button class="btn-add-to-cart" data-id="\( {p.id}" data-nome=" \){escapeHtml(p.nome)}" data-prezzo="${p.prezzo}">➕ Aggiungi</button>
             `;
+            grid.appendChild(card);
         });
 
-        sezioneHTML.innerHTML = `
-            <h2 class="categoria-titolo">${categoria.nome}</h2>
-            <div class="prodotti-grid">${prodottiHTML}</div>
-        `;
-        menuContainer.appendChild(sezioneHTML);
+        section.appendChild(grid);
+        menuContainer.appendChild(section);
     });
 
-    // Avvisa in modo asincrono cart.js che i bottoni sono pronti per essere cliccati
     window.dispatchEvent(new Event("menuRendered"));
 }
 
