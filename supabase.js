@@ -1,10 +1,9 @@
-// supabase.js - Chiave di connessione centralizzata ed isolata
-const SUPABASE_URL = "https://mllmvjaiaqdurbnqyonh.supabase.co";
-const SUPABASE_KEY = "sb_publishable_YJtWbi_UYBXqldQSE8pmmg_7JXexbfn";
+// supabase.js
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-if (typeof supabase === 'undefined') {
-    console.error("Errore Critico: SDK di Supabase non caricato nel DOM.");
-}
+const SUPABASE_URL = 'https://mllmvjaiaqdurbnqyonh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_YJtWbi_UYBXqldQSE8pmmg_7JXexbfn';
 
-// Esporta l'istanza corretta utilizzata da tutti gli altri script del SaaS
-export const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+console.log("✅ Supabase Client inizializzato");
