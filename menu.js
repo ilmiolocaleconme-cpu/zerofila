@@ -1,6 +1,5 @@
 import { supabaseClient } from './supabase.js';
 import { escapeHtml, formatPrice, showToast } from './utils.js';
-import { initOrderLogic, getCartItems, saveCart, renderCart } from './order.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
@@ -20,7 +19,7 @@ async function initMenu() {
             .eq("slug", TARGET_SLUG)
             .single();
 
-        if (restError || !ristorante) throw new Error("Locale non trovato nel database. Controlla la tabella 'ristoranti'.");
+        if (restError || !ristorante) throw new Error("Locale non trovato nel database.");
 
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
         if (restNameHeader) restNameHeader.textContent = ristorante.nome;
@@ -40,8 +39,7 @@ async function initMenu() {
         const prodotti = prodRes.data || [];
 
         if (!categorie.length || !prodotti.length) {
-            menuContainer.innerHTML = `<p class="empty-msg">Il menu di '${ristorante.nome}' è attualmente vuoto su Supabase.</p>`;
-            renderCart();
+            menuContainer.innerHTML = `<p class="empty-msg">Il menu è attualmente vuoto.</p>`;
             return;
         }
 
@@ -74,9 +72,10 @@ async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Inizializza il carrello e la logica degli ordini passando i dati del ristorante
-        renderCart();
-        initOrderLogic(ristorante);
+        // IMPORTAZIONE DINAMICA DI ORDER.JS CON RESET DELLA CACHE AUTOMATICO
+        const moduloOrdine = await import(`./order.js?t=${Date.now()}`);
+        moduloOrdine.renderCart();
+        moduloOrdine.initOrderLogic(ristorante);
 
     } catch (err) {
         console.error(err);
@@ -91,25 +90,27 @@ document.addEventListener("click", (e) => {
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         
-        let cart = getCartItems();
-        const esistente = cart.find(item => item.id === id);
+        // Importazione dinamica al volo per usare le funzioni del carrello
+        import(`./order.js?t=${Date.now()}`).then((modulo) => {
+            let cart = modulo.getCartItems();
+            const esistente = cart.find(item => item.id === id);
 
-        if (esistente) {
-            esistente.quantita += 1;
-        } else {
-            cart.push({
-                carrelloId: crypto.randomUUID(),
-                id: id,
-                nome: nome,
-                prezzo: prezzo,
-                quantita: 1
-            });
-        }
-        saveCart(cart);
-        renderCart();
-        showToast(`Aggiunto: ${nome}`);
+            if (esistente) {
+                esistente.quantita += 1;
+            } else {
+                cart.push({
+                    carrelloId: crypto.randomUUID(),
+                    id: id,
+                    nome: nome,
+                    prezzo: prezzo,
+                    quantita: 1
+                });
+            }
+            modulo.saveCart(cart);
+            modulo.renderCart();
+            showToast(`Aggiunto: ${nome}`);
+        });
     }
 });
 
-// Avvio esecuzione dell'app
 initMenu();
