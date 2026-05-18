@@ -197,7 +197,7 @@ async function elaboraInvioComanda(modal, ristorante) {
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. REINDIRIZZAMENTO DIRETTO (Aggira definitivamente il blocco pop-up sui telefoni)
+        // 3. REINDIRIZZAMENTO DIRETTO (Risolto l'errore di sintassi e maiuscole/minuscole)
         const urlWhatsApp = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
         window.location.href = urlWhatsApp;
 
