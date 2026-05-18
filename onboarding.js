@@ -1,4 +1,3 @@
-// onboarding.js
 import { supabaseClient } from './supabase.js';
 
 const selectRistorante = document.getElementById("select-ristorante");
@@ -24,10 +23,10 @@ async function caricaRistoranti() {
             .order("nome", { ascending: true });
 
         if (error) throw error;
-        listaLocaliCompleta = ristoranti;
+        listaLocaliCompleta = ristoranti || [];
 
         selectRistorante.innerHTML = '<option value="">-- Seleziona un ristorante --</option>';
-        ristoranti.forEach(locale => {
+        listaLocaliCompleta.forEach(locale => {
             const option = document.createElement("option");
             option.value = locale.id;
             option.textContent = locale.nome;
@@ -77,13 +76,14 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     titleQrBox.style.display = "block";
     const hiddenGen = document.getElementById("qr-hidden-generator");
 
-    const baseLink = `https://zerofila.it{locale.slug}`;
+    // Risolto il bug dell'interpolazione stringa: ora punta all'URL reale del menu
+    const baseLink = `https://vercel.app{locale.slug}`;
 
     // 1. Generazione del QR Code Generico (Social, Packaging, Asporto)
     if (generaGenerico === "si") {
         const card = document.createElement("div");
         card.className = "qr-card";
-        card.innerHTML = `<strong>🔗 QR GENERICO</strong><br><div id="qr-gen-target"></div><span style="font-size:0.7rem; color:var(--color-pronto);">${locale.slug}</span>`;
+        card.innerHTML = `<strong>🔗 QR GENERICO</strong><br><div id="qr-gen-target" style="display:flex; justify-content:center; margin:10px 0;"></div><span style="font-size:0.7rem; color:var(--color-pronto);">${locale.slug}</span>`;
         qrPreviewBox.appendChild(card);
         
         hiddenGen.innerHTML = "";
@@ -91,18 +91,18 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
         setTimeout(() => { 
             const img = hiddenGen.querySelector("img");
             if (img) document.getElementById("qr-gen-target").appendChild(img.cloneNode(true)); 
-        }, 100);
+        }, 150);
     }
 
     // 2. Generazione controllata e sequenziale dei QR Code dei singoli tavoli sala
     if (numeroTavoli > 0) {
         for (let i = 1; i <= numeroTavoli; i++) {
-            const tavoloLink = `${baseLink}?tavolo=${i}`;
+            const tavoloLink = `${baseLink}&tavolo=${i}`;
             const cardTavolo = document.createElement("div");
             cardTavolo.className = "qr-card";
             
             const targetId = `qr-tavolo-target-${i}`;
-            cardTavolo.innerHTML = `<strong>🪑 TAVOLO ${i}</strong><br><div id="${targetId}"></div><span style="font-size:0.7rem; color:var(--text-muted);">?tavolo=${i}</span>`;
+            cardTavolo.innerHTML = `<strong>🪑 TAVOLO ${i}</strong><br><div id="${targetId}" style="display:flex; justify-content:center; margin:10px 0;"></div><span style="font-size:0.7rem; color:var(--text-muted);">?tavolo=${i}</span>`;
             qrPreviewBox.appendChild(cardTavolo);
 
             // Utilizziamo un micro-timeout scalato per non sovraccaricare il motore grafico del browser
@@ -155,9 +155,9 @@ btnAvvia.onclick = async () => {
             statusDiv.innerHTML += "✅ QR Code pronti e visualizzati a schermo.<br>";
         }
 
-        // STEP 3: Spinta dell'immagine del menù verso GPT-4o Vision (Asincrona)
+        // STEP 3: Spinta dell'immagine del menù verso l'AI Parser per la digitalizzazione
         if (menuFile) {
-            statusDiv.innerHTML += "🧠 Invio immagine a GPT-4o Vision per la digitalizzazione del listino... (Attendi circa 10-15 secondi)<br>";
+            statusDiv.innerHTML += "🧠 Invio immagine all'AI per la digitalizzazione del listino... (Attendi circa 10-15 secondi)<br>";
             
             const reader = new FileReader();
             reader.readAsDataURL(menuFile);
@@ -165,7 +165,7 @@ btnAvvia.onclick = async () => {
                 const base64String = reader.result.split(',')[1];
 
                 try {
-                    // Chiama la Edge Function centralizzata di Supabase
+                    // Chiamata all'endpoint Edge Function di Supabase
                     const response = await fetch("https://supabase.co", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -187,7 +187,6 @@ btnAvvia.onclick = async () => {
                 }
             };
         } else {
-            // Se non c'era nessun menù da scannerizzare, chiude l'onboarding (es: caricamento solo del logo/QR)
             mostraSuccessoFinale();
         }
 
@@ -196,23 +195,23 @@ btnAvvia.onclick = async () => {
     }
 };
 
+// --- FUNZIONI DI CONCLUSIONE INTERFACCIA (RIPRISTINATE E COMPLETATE) ---
 function mostraSuccessoFinale() {
-    statusDiv.style.background = "rgba(46, 196, 182, 0.1)";
-    statusDiv.style.color = "#2ec4b6";
-    statusDiv.style.border = "1px solid #2ec4b6";
-    statusDiv.innerHTML += "<br>🏆 <strong>ONBOARDING COMPLETATO CON SUCCESSO!</strong> Il ristorante è configurato, le tabelle sono popolate e il locale è attivo su ZeroFila.";
+    statusDiv.style.background = "rgba(16, 185, 129, 0.1)";
+    statusDiv.style.color = "#10b981";
+    statusDiv.style.border = "1px solid #10b981";
+    statusDiv.innerHTML += "🚀 <strong>Onboarding completato con successo! All systems nominal.</strong><br>";
     btnAvvia.disabled = false;
-    menuInput.value = "";
-    logoInput.value = "";
 }
 
-function mostraErroreFinale(msg) {
+function mostraErroreFinale(messaggio) {
+    statusDiv.style.display = "block";
     statusDiv.style.background = "rgba(239, 68, 68, 0.1)";
     statusDiv.style.color = "#ef4444";
     statusDiv.style.border = "1px solid #ef4444";
-    statusDiv.innerHTML += `<br>❌ <strong>Errore critico durante l'operazione:</strong> ${msg}`;
+    statusDiv.innerHTML += `❌ <strong>ERRORE PROCEDURA:</strong> ${messaggio}<br>`;
     btnAvvia.disabled = false;
 }
 
-// Avvia il caricamento iniziale dei locali registrati
+// Avvio automatico al caricamento
 caricaRistoranti();
