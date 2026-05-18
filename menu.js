@@ -1,4 +1,3 @@
-// menu.js
 import { supabaseClient } from './supabase.js';
 import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
 
@@ -68,7 +67,7 @@ function renderMenu(categorie, prodotti) {
                     <p>${escapeHtml(p.descrizione || '')}</p>
                     <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                 </div>
-                <button class="btn-add-to-cart" data-id="\( {p.id}" data-nome=" \){escapeHtml(p.nome)}" data-prezzo="${p.prezzo}">➕ Aggiungi</button>
+                <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}">➕ Aggiungi</button>
             `;
             grid.appendChild(card);
         });
