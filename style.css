@@ -1,76 +1,454 @@
-body {
+/* ==========================================================================
+   0. CONFIGURAZIONE VARIABILI E DESIGN SYSTEM (UNIFICATO SAAS)
+   ========================================================================== */
+:root {
+  --bg-app: #0f172a;
+  --bg-card: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  
+  /* Stati e Canali logistici */
+  --color-ricevuto: #ef4444;       /* Rosso */
+  --color-preparazione: #f59e0b;   /* Arancione */
+  --color-pronto: #10b981;         /* Verde */
+  --color-consegnato: #64748b;      /* Grigio ardesia */
+  
+  --accent: #00ebc7;
+  --accent-hover: #00c4a6;
+  --transition: all 0.25s ease;
+}
+
+* {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: Arial, sans-serif;
-  background: #f5f5f5;
 }
 
-.header {
-  background: black;
-  color: white;
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   1. STRUTTURA LAYOUT E TESTATE (INDEX.HTML / KITCHEN / ADMIN)
+   ========================================================================== */
+.branding-header, .header {
+  background-color: #020617;
   padding: 20px;
   text-align: center;
+  border-bottom: 1px solid #1e293b;
 }
 
+.branding-header h1, .header h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  min-height: calc(100vh - 75px);
+}
+
+@media (max-width: 960px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   2. CLIENTE: MENU DINAMICO ED ELEMENTI VENDITA (MENU.JS)
+   ========================================================================== */
 #menu-container {
-  padding: 20px;
+  padding: 30px;
 }
 
-.categoria {
-  margin-top: 40px;
+.menu-section {
+  margin-bottom: 40px;
 }
 
-.prodotto {
-  background: white;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.prezzo {
-  font-weight: bold;
-  margin-top: 10px;
-}
-
-
-#kitchen-orders {
-  padding: 20px;
-}
-
-.ordine-card {
-  background: white;
-  border-radius: 14px;
-  padding: 20px;
+.categoria-titolo {
+  font-size: 1.4rem;
+  border-bottom: 2px solid #334155;
+  padding-bottom: 8px;
   margin-bottom: 20px;
+  color: var(--accent);
 }
 
-.ordine-card h2 {
-  margin-top: 0;
+.prodotti-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
-.ordine-stato {
+.prodotto-card {
+  background-color: var(--bg-card);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: var(--transition);
+}
+
+.prodotto-card:hover {
+  transform: translateY(-2px);
+  border-color: #475569;
+}
+
+.prodotto-info h3 {
+  font-size: 1.15rem;
+  margin-bottom: 6px;
+}
+
+.prodotto-info p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
   margin-bottom: 15px;
 }
 
-.ordine-stato select {
-  padding: 8px;
+.prezzo {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 15px;
+}
+
+.btn-add-to-cart {
+  width: 100%;
+  padding: 10px;
+  background-color: #334155;
+  color: white;
+  border: none;
   border-radius: 8px;
-  margin-top: 5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-.stato-ricevuto {
-  border-left: 8px solid orange;
+.btn-add-to-cart:hover {
+  background-color: #475569;
 }
 
-.stato-preparazione {
-  border-left: 8px solid dodgerblue;
+/* ==========================================================================
+   3. CLIENTE: SIDEBAR CARRELLO (CART.JS)
+   ========================================================================== */
+#cart-sidebar {
+  background-color: #020617;
+  border-left: 1px solid #1e293b;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 75px);
 }
 
-.stato-pronto {
-  border-left: 8px solid green;
+@media (max-width: 960px) {
+  #cart-sidebar {
+    position: relative;
+    height: auto;
+    border-left: none;
+    border-top: 2px solid #1e293b;
+  }
 }
 
-.stato-consegnato {
-  border-left: 8px solid gray;
-  opacity: 0.7;
+#cart-sidebar h2 {
+  font-size: 1.3rem;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #1e293b;
+}
+
+#cart-items {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.cart-empty {
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 40px;
+  font-style: italic;
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-card);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+.item-nome {
+  flex: 1;
+  font-weight: 500;
+  padding-right: 10px;
+}
+
+.item-controlli {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 15px;
+}
+
+.btn-cart-meno, .btn-cart-piu {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background-color: #334155;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.item-quantita {
+  font-weight: 600;
+  min-width: 15px;
+  text-align: center;
+}
+
+.item-prezzo {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.cart-footer {
+  border-top: 1px solid #1e293b;
+  padding-top: 15px;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+#cart-total {
+  color: var(--accent);
+}
+
+#send-order {
+  width: 100%;
+  padding: 14px;
+  background-color: var(--accent);
+  color: #001e1d;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+#send-order:hover {
+  background-color: var(--accent-hover);
+}
+
+/* ==========================================================================
+   4. MODAL DI CHECKOUT CASSA (ORDER.JS)
+   ========================================================================== */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(2, 6, 23, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.modal-content {
+  background-color: var(--bg-card);
+  border: 1px solid #334155;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 500px;
+  padding: 30px;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+}
+
+.modal-content label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.modal-content .required {
+  color: #ef4444;
+}
+
+.modal-content input, .modal-content select, .modal-content textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: white;
+  margin-bottom: 18px;
+  font-family: inherit;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+#modal-cancel {
+  padding: 10px 20px;
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#modal-confirm {
+  padding: 10px 20px;
+  background-color: var(--color-pronto);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   5. STAFF: KDS DASHBOARD CUCINA IN REALTIME (KITCHEN.JS)
+   ========================================================================== */
+.controls-bar {
+  background-color: var(--bg-card);
+  padding: 12px 20px;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  justify-content: center;
+}
+
+#enable-audio {
+  padding: 8px 16px;
+  background-color: #334155;
+  color: white;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#kitchen-orders {
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 35px;
+}
+
+.kitchen-section {
+  border: 1px solid #1e293b;
+  background-color: #020617;
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 15px;
+}
+
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.ordine-card {
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  padding: 18px;
+  border-top: 6px solid #64748b;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Gestione dei bordi colorati in base allo stato comanda */
+.ordine-card.stato-ricevuto { border-top-color: var(--color-ricevuto); }
+.ordine-card.stato-preparazione { border-top-color: var(--color-preparazione); }
+.ordine-card.stato-pronto { border-top-color: var(--color-pronto); }
+.ordine-card.stato-consegnato { border-top-color: var(--color-consegnato); opacity: 0.5; }
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.card-header h3 { font-size: 1.2rem; }
+
+.badge {
+  font-size: 0.75rem;
+  background-color: #0f172a;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.prodotti-list {
+  list-style: none;
+  margin: 12px 0 18px 0;
+  padding-top: 10px;
+  border-top: 1px dashed #334155;
+}
+
+.prodotti-list li {
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.ordine-card select {
+  width: 100%;
+  padding: 8px;
+  background-color: #0f172a;
+  color: white;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* States statici comuni */
+.loading-state, .error-msg, .empty-msg {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
 }
