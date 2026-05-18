@@ -66,7 +66,6 @@ export function initOrderLogic(ristorante) {
 }
 
 function showOrderModal(ristorante) {
-    // Estrae l'eventuale numero del tavolo passato via QR code nell'URL (?tavolo=3)
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
 
@@ -143,7 +142,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Inserimento ordine su Supabase per la dashboard cucina
+        // 1. Salvataggio record comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -162,7 +161,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
-        // Inserimento prodotti dell'ordine su Supabase
+        // Inserimento prodotti correlati su Supabase
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -172,7 +171,7 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Costruzione messaggio di testo per la comanda WhatsApp
+        // 2. Composizione della comanda testuale per WhatsApp
         let msg = `🛍️ *NUOVO ORDINE - ZEROCODA* \n`;
         msg += `👤 *Cliente:* ${nome}\n`;
         msg += `📞 *Tel:* ${telefono}\n`;
@@ -191,15 +190,14 @@ async function elaboraInvioComanda(modal, ristorante) {
         const numeroLocale = (ristorante.telefono || "393896190004").replace(/\s+/g, '');
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
 
-        // Svuota carrello e pulisce l'interfaccia grafico
+        // Pulizia dello stato locale prima del redirect
         saveCart([]);
         modal.remove();
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. Reindirizzamento ed invio su WhatsApp Web / App
+        // 3. APERTURA CHAT WHATSAPP CORRETTA CORRETTA (Sistemata)
         window.open(`https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`, "_blank");
-
 
     } catch (err) {
         console.error(err);
@@ -212,7 +210,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// --- CAPTURING EVENTI CLICK CONTROLLI QUANTITÀ CARRELLO ---
+// --- CAPTURING EVENTI CLICK INTERFACCIA SIDEBAR ---
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
