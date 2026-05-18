@@ -5,7 +5,6 @@ const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 const TARGET_SLUG = "al-panetto";
 
-// --- FUNZIONI CARRELLO ESPORTATE ---
 export function getCartItems() {
     const saved = localStorage.getItem(`zf_cart_${TARGET_SLUG}`);
     return saved ? JSON.parse(saved) : [];
@@ -47,11 +46,9 @@ export function renderCart() {
     if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
 }
 
-// --- LOGICA DI INVIO ORDINE E MODAL ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
-        // Rimuove eventuali listener precedenti per evitare attivazioni doppie causate da re-render
         btnProcedi.replaceWith(btnProcedi.cloneNode(true));
         const newBtnProcedi = document.getElementById("send-order");
         
@@ -142,7 +139,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio record comanda su Supabase per lo schermo cucina
+        // 1. Salvataggio record comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -161,7 +158,6 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
-        // Inserimento dettagli prodotti correlati su Supabase
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -171,33 +167,19 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Composizione della comanda testuale per WhatsApp
-        let msg = `🛍️ *NUOVO ORDINE - ZEROCODA* \n`;
-        msg += `👤 *Cliente:* ${nome}\n`;
-        msg += `📞 *Tel:* ${telefono}\n`;
-        msg += `📦 *Tipo:* ${tipo.toUpperCase()}${tavolo ? ` (Tavolo: ${tavolo})` : ''}${indirizzo ? ` (\n📍 Indirizzo: ${indirizzo})` : ''}\n`;
-        if (note) msg += `📝 *Note:* ${note}\n`;
-        msg += `----------------------------------\n`;
-        
-        cart.forEach(item => {
-            msg += `• ${item.quantita}x ${item.nome} (€ ${(item.prezzo * item.quantita).toFixed(2)})\n`;
-        });
-        
-        msg += `----------------------------------\n`;
-        msg += `💰 *TOTALE DA PAGARE:* € ${subtotale.toFixed(2)}\n\n`;
-        msg += `Ordinato tramite *ZeroFila* 🍔`;
+        // 2. Importazione Dinamica con Cache Busting Integrato del modulo messaggi
+        const moduloMessaggi = await import(`./messaggi.js?t=${Date.now()}`);
+        const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        // Estrazione e formattazione del numero telefonico del ristorante
         const numeroLocale = (ristorante.telefono || "393896190004").replace(/\s+/g, '');
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
 
-        // Svuota lo storage del carrello e aggiorna la sidebar
         saveCart([]);
         modal.remove();
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. REINDIRIZZAMENTO DIRETTO (Risolto l'errore di sintassi e maiuscole/minuscole)
+        // 3. Reindirizzamento diretto a WhatsApp con variabili allineate
         const urlWhatsApp = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
         window.location.href = urlWhatsApp;
 
@@ -212,7 +194,6 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// --- CAPTURING EVENTI CLICK CONTROLLI QUANTITÀ SIDEBAR ---
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
