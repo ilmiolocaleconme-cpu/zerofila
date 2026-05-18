@@ -4,32 +4,49 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZeroFila - Ordina Online</title>
+  
+  <!-- Collegamento allo stile grafico unificato Dark Mode -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
+  <!-- Testata Branding dell'Applicazione -->
   <header class="branding-header">
     <h1 id="restaurant-name">ZeroFila Menu</h1>
   </header>
 
+  <!-- Layout Principale Split: Menu + Sidebar Carrello -->
   <div class="app-layout">
-    <!-- Contenitore Menu Dinamico -->
+    
+    <!-- Contenitore Principale: I prodotti vengono iniettati qui da menu.js -->
     <main id="menu-container">
       <div class="loading-state">Connessione al database...</div>
     </main>
 
-    <!-- Sidebar Carrello -->
+    <!-- Sidebar Laterale Destra: Gestione del Carrello in tempo reale -->
     <aside id="cart-sidebar">
       <h2>Il tuo Carrello</h2>
+      
+      <!-- Lista dinamica dei prodotti aggiunti (Gestita da order.js) -->
       <div id="cart-items"></div>
+      
+      <!-- Footer del carrello fisso in basso con totale e checkout -->
       <div class="cart-footer">
-        <div class="total-row">Totale: <span id="cart-total">€ 0.00</span></div>
-        <button id="send-order">🛒 Procedi all'Ordine</button>
+        <div class="total-row">
+          <span>Totale:</span>
+          <span id="cart-total">€ 0.00</span>
+        </div>
+        <button id="send-order" type="button">🛒 Procedi all'Ordine</button>
       </div>
     </aside>
+    
   </div>
 
-  <!-- Unico punto di ingresso: previene corse critiche dei moduli browser -->
+  <!-- 
+    PUNTO DI INGRESSO UNICO SAAS: 
+    Carica menu.js come modulo principale. Questo previene i conflitti dei browser mobili 
+    ed evita che i file provino a manipolare il DOM prima del rendering dei prodotti.
+  -->
   <script type="module" src="menu.js"></script>
 
 </body>
