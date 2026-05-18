@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZeroFila - Ordina Online</title>
   <link rel="stylesheet" href="style.css" />
-  
-  <!-- CDN SDK Supabase obbligatoria (Caricata prima degli script modulari) -->
-  <script src="https://jsdelivr.net"></script>
 </head>
 <body>
 
@@ -18,7 +15,7 @@
   <div class="app-layout">
     <!-- Contenitore Menu Dinamico -->
     <main id="menu-container">
-      <p class="loading-state">Caricamento menu in corso...</p>
+      <div class="loading-state">Connessione al database...</div>
     </main>
 
     <!-- Sidebar Carrello -->
@@ -32,11 +29,8 @@
     </aside>
   </div>
 
-  <!-- Caricamento script ad architettura modulare ES6 (Importante mantenere questo ordine) -->
-  <script type="module" src="supabase.js"></script>
+  <!-- Unico punto di ingresso: previene corse critiche dei moduli browser -->
   <script type="module" src="menu.js"></script>
-  <script type="module" src="cart.js"></script>
-  <script type="module" src="order.js"></script>
 
 </body>
 </html>
