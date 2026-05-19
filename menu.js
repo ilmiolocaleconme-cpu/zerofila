@@ -1,11 +1,10 @@
 import { supabaseClient } from './supabase.js';
-import { escapeHtml, formatPrice } from './utils.js';
+import { escapeHtml, formatPrice, showToast } from './utils.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
-const TARGET_SLUG = "al-panetto";
 
-// Variabile di modulo per memorizzare l'istanza corretta e sincronizzata di order.js
+const TARGET_SLUG = "al-panetto";
 let orderModInstance = null;
 
 export async function initMenu() {
@@ -70,7 +69,6 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // IMPORTAZIONE UNICA SINCRONIZZATA ALL'AVVIO: Distrugge la cache e preserva le variabili
         orderModInstance = await import(`./order.js?t=${Date.now()}`);
         orderModInstance.renderCart();
         orderModInstance.initOrderLogic(ristorante);
@@ -81,7 +79,6 @@ export async function initMenu() {
     }
 }
 
-// Intercettatore dei click sui prodotti (Usa l'istanza condivisa)
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-add-to-cart") && orderModInstance) {
         const id = e.target.getAttribute("data-id");
@@ -104,5 +101,6 @@ document.addEventListener("click", (e) => {
         }
         orderModInstance.saveCart(cart);
         orderModInstance.renderCart();
+        showToast(`Aggiunto: ${nome}`);
     }
 });
