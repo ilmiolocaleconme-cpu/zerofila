@@ -30,12 +30,12 @@
     </aside>
   </div>
 
-  <!-- Il Direttore d'orchestra: azzera la cache di tutta l'app all'istante -->
+  <!-- Distrugge la cache dello smartphone del cliente in automatico -->
   <script>
     (function() {
       const script = document.createElement('script');
       script.type = 'module';
-      script.src = `main.js?t=${Date.now()}`;
+      script.src = `menu.js?v=${Date.now()}`;
       document.body.appendChild(script);
     })();
   </script>
