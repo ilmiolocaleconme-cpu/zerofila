@@ -4,12 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ZeroFila - SuperAdmin AI Advanced Onboarding</title>
-  
-  <!-- Collegamento allo stile grafico unificato anti-crash -->
   <link rel="stylesheet" href="style.css" />
   
   <style>
-    /* Estensioni di stile specifiche per la console privata SuperAdmin */
     .admin-box { max-width: 650px; margin: 40px auto; background: var(--bg-card, #1e293b); padding: 35px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
     .admin-box h1 { color: var(--color-pronto, #10b981); font-size: 1.6rem; margin-bottom: 6px; }
     .subtitle { color: var(--text-muted, #94a3b8); font-size: 0.9rem; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; }
@@ -21,13 +18,20 @@
     button { background: var(--color-pronto, #10b981); color: #001e1d; font-weight: bold; cursor: pointer; border: none; margin-top: 15px; font-size: 1.1rem; }
     button:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
     #status { padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold; font-size: 0.95rem; display: none; line-height: 1.4; }
+    
+    /* Box Stile di evidenza per i link del commerciante */
+    .links-box { display: none; background: #0f172a; border: 1px dashed #10b981; border-radius: 10px; padding: 20px; margin-top: 20px; }
+    .links-box h3 { margin-top: 0; color: #10b981; font-size: 1.1rem; }
+    .link-row { background: #1e293b; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #334155; word-break: break-all; }
+    .link-label { font-size: 0.8rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
+    .link-url { font-size: 0.95rem; color: #38bdf8; display: block; margin-top: 4px; text-decoration: none; }
+    
     #qr-preview-box { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
     @media (max-width: 480px) { #qr-preview-box { grid-template-columns: repeat(2, 1fr); } }
     .qr-card { background: #0f172a; padding: 12px; border-radius: 10px; text-align: center; font-size: 0.8rem; border: 1px solid #334155; }
     .qr-card img { max-width: 100%; height: auto; margin: 8px auto; display: block; border-radius: 4px; }
   </style>
 
-  <!-- CDN della libreria QRCode.js ufficiale (Caricata in modo sicuro prima dei moduli) -->
   <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -36,13 +40,11 @@
     <h1>⚡ ZeroFila SuperAdmin Studio</h1>
     <div class="subtitle">Strumento riservato per l'onboarding lampo dei locali (Menu AI, Loghi e QR-Kit).</div>
     
-    <!-- 1. Menu a tendina dei locali -->
     <label for="select-ristorante">1. Seleziona il Locale da configurare</label>
     <select id="select-ristorante">
       <option value="">Caricamento locali in corso...</option>
     </select>
 
-    <!-- 2. Sezione File Caricamenti -->
     <div class="row-flex">
       <div class="col-flex">
         <label for="logo-ristorante">2. Carica Logo del Locale</label>
@@ -54,7 +56,6 @@
       </div>
     </div>
 
-    <!-- 3. Sezione Configurazione Marketing QR -->
     <div class="row-flex" style="border-top: 1px dashed #334155; padding-top: 15px; margin-top: 10px;">
       <div class="col-flex">
         <label for="check-qr-generico">Genera QR Vetrofania / Social?</label>
@@ -69,21 +70,32 @@
       </div>
     </div>
 
-    <!-- Pulsante di avvio transazione massiva -->
     <button type="button" id="btn-avvia-onboarding">🚀 Esegui Onboarding Completo a Schermo</button>
 
-    <!-- Console di log e avanzamento -->
     <div id="status"></div>
     
-    <!-- Contenitore di calcolo invisibile usato dalla libreria QR per evitare crash di rendering -->
+    <!-- BOX AUTOMATICO LINK IN PRIMO PIANO -->
+    <div id="links-ristoratore-box" class="links-box">
+      <h3>📋 Collegamenti Privati del Commerciante</h3>
+      <p style="font-size:0.85rem; color:#94a3b8; margin:0;">Invia questi link al ristoratore. Potrà aprirli dal telefono e salvarli sulla Home come un'applicazione.</p>
+      
+      <div class="link-row">
+        <span class="link-label">📱 Link Menù Digitale Clienti</span>
+        <a id="link-utente-target" class="link-url" href="#" target="_blank">Generazione...</a>
+      </div>
+      
+      <div class="link-row">
+        <span class="link-label">👨‍🍳 Link Monitor Cucina (KDS)</span>
+        <a id="link-cucina-target" class="link-url" href="#" target="_blank">Generazione...</a>
+      </div>
+    </div>
+    
     <div id="qr-hidden-generator" style="display: none;"></div>
     
-    <!-- Box dei risultati dei QR scaricabili -->
     <h3 id="title-qr-box" style="margin-top:25px; font-size:1.1rem; display:none; color:var(--color-pronto);">📋 QR-Kit Generato (Pronto da salvare/stampare):</h3>
     <div id="qr-preview-box"></div>
   </div>
 
-  <!-- Caricamento dello script in modalità modulo ES6 -->
   <script type="module" src="onboarding.js"></script>
 </body>
 </html>
