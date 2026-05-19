@@ -30,13 +30,12 @@
     </aside>
   </div>
 
-  <!-- Script di Reset Automatico della Cache (Cache Busting) -->
+  <!-- Il Direttore d'orchestra: azzera la cache di tutta l'app all'istante -->
   <script>
     (function() {
-      const timestamp = Date.now();
       const script = document.createElement('script');
       script.type = 'module';
-      script.src = `menu.js?t=${timestamp}`;
+      script.src = `main.js?t=${Date.now()}`;
       document.body.appendChild(script);
     })();
   </script>
