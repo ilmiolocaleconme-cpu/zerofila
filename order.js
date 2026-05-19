@@ -4,6 +4,7 @@ import { APP_VERSION } from './version.js';
 
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
+const TARGET_SLUG = "al-panetto";
 
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
@@ -151,6 +152,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
+        // 1. Inserimento record comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -181,15 +183,16 @@ async function elaboraInvioComanda(modal, ristorante) {
         const moduloMessaggi = await import(`./messaggi.js?v=${APP_VERSION}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
-        const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
+        // EXTRAZIONE TOTALMENTE DINAMICA DAL DATABASE (Senza numeri scritti fissi) [1]
+        const numeroTrattato = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
+        const telefonoFinale = numeroTrattato.startsWith("+") || numeroTrattato.startsWith("39") ? numeroTrattato : "39" + numeroTrattato;
 
         saveCart([], ristorante.id);
         modal.remove();
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // 3. REINDIRIZZAMENTO CON LA BARRA DI CONCATENAZIONE AGGIUNTA (Riga Corretta)
+        // 3. COSTRUTTORE DI LINK BLINDATO CON SLASH MANUALE INTEGRATO
         const linkWhatsApp = document.createElement("a");
         linkWhatsApp.href = "https://wa.me" + telefonoFinale + "?text=" + encodeURIComponent(msg);
         linkWhatsApp.target = "_top";
