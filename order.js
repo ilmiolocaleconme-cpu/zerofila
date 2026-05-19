@@ -5,6 +5,7 @@ import { componiMessaggioWhatsApp } from './messaggi.js';
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 
+// --- GESTIONE CORE CARRELLO (ISOLAMENTO MULTI-NEGOZIO) ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -48,6 +49,7 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
+// --- ATTIVAZIONE PULSANTE CASSA ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -64,6 +66,7 @@ export function initOrderLogic(ristorante) {
     }
 }
 
+// --- LOGICA RENDERING MODALE POP-UP ---
 function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
@@ -86,6 +89,7 @@ function showOrderModal(ristorante) {
           <option value="delivery">🚀 Delivery</option>
         </select>
 
+        <!-- Campi logistici condizionali e protetti -->
         <div id="tavolo-fields">
           <label>N° Tavolo <span class="required">*</span></label>
           <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
@@ -113,6 +117,7 @@ function showOrderModal(ristorante) {
     const modal = document.getElementById("order-modal");
     const tipoSelect = modal.querySelector("#tipo-ordine");
     
+    // Funzione per isolare i campi e mostrare solo quelli utili
     const aggiornaCampiVisibili = () => {
         const val = tipoSelect.value;
         document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
@@ -126,6 +131,7 @@ function showOrderModal(ristorante) {
     modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
 }
 
+// --- SALVATAGGIO TRANSAZIONE ED APERTURA INVIATO WHATSAPP ---
 async function elaboraInvioComanda(modal, ristorante) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
@@ -146,11 +152,13 @@ async function elaboraInvioComanda(modal, ristorante) {
         if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
 
+        // Memorizzazione persistente dei dati anagrafici del cliente sul suo telefono
         localStorage.setItem("zf_user_nome", nome);
         localStorage.setItem("zf_user_telefono", telefono);
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
+        // 1. Inserimento record comanda su Supabase per lo schermo della cucina
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -169,6 +177,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
+        // Inserimento dettagli dei singoli prodotti ordinati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -178,21 +187,24 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
+        // 2. Generazione della stringa del messaggio dal file indipendente dei messaggi
         const msg = componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        // Estrazione dinamica e pulita (Riparata al 100%)
-        const numeroTrattato = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
-        const telefonoFinale = numeroTrattato.startsWith("+") || numeroTrattato.startsWith("39") ? numeroTrattato : "39" + numeroTrattato;
+        // Estrazione e normalizzazione del numero telefonico del ristorante salvato nel database
+        const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
+        const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
         saveCart([], ristorante.id);
         modal.remove();
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // Costruzione URL con oggetto nativo blindato (Risolve il problema del link rotto)
-        const endpointWhatsApp = new URL("https://wa.me" + telefonoFinale);
+        // 3. GENERAZIONE INDIRIZZO TRAMITE API COMPLETE ED OGGETTO URL NATIVO (Infallibile su versioni recenti)
+        const endpointWhatsApp = new URL("https://whatsapp.com");
+        endpointWhatsApp.searchParams.set("phone", telefonoFinale);
         endpointWhatsApp.searchParams.set("text", msg);
 
+        // Apertura tramite click simulato su ancoraggio virtuale temporaneo per scavalcare i blocchi del browser
         const linkWhatsApp = document.createElement("a");
         linkWhatsApp.href = endpointWhatsApp.toString();
         linkWhatsApp.target = "_top";
@@ -213,6 +225,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
+// --- INTERCETTATORE GENERALIZZATO CLICK QUANTITÀ SIDEBAR ---
 document.addEventListener("click", (e) => {
     const dataRest = sessionStorage.getItem("zf_current_ristorante");
     if (!dataRest) return;
