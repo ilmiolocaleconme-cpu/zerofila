@@ -1,11 +1,11 @@
 import { supabaseClient } from './supabase.js';
 import { escapeHtml, formatPrice, showToast } from './utils.js';
-import { componiMessaggioWhatsApp } from './messaggi.js';
 
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
+const TARGET_SLUG = "al-panetto";
 
-// --- GESTIONE CORE CARRELLO (ISOLAMENTO MULTI-NEGOZIO) ---
+// --- GESTIONE STORAGE CARRELLO (ISOLAMENTO MULTI-NEGOZIO) ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -188,7 +188,8 @@ async function elaboraInvioComanda(modal, ristorante) {
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
         // 2. Generazione della stringa del messaggio dal file indipendente dei messaggi
-        const msg = componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
+        const moduloMessaggi = await import(`./messaggi.js`);
+        const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
         // Estrazione e normalizzazione del numero telefonico del ristorante salvato nel database
         const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
@@ -199,14 +200,9 @@ async function elaboraInvioComanda(modal, ristorante) {
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // 3. GENERAZIONE INDIRIZZO TRAMITE API COMPLETE ED OGGETTO URL NATIVO (Infallibile su versioni recenti)
-        const endpointWhatsApp = new URL("https://whatsapp.com");
-        endpointWhatsApp.searchParams.set("phone", telefonoFinale);
-        endpointWhatsApp.searchParams.set("text", msg);
-
-        // Apertura tramite click simulato su ancoraggio virtuale temporaneo per scavalcare i blocchi del browser
+        // 3. APERTURA CON SCHEMA DEEP-LINK NATIVO (Scavalca i browser e forza l'avvio della App WhatsApp)
         const linkWhatsApp = document.createElement("a");
-        linkWhatsApp.href = endpointWhatsApp.toString();
+        linkWhatsApp.href = "whatsapp://send?phone=" + telefonoFinale + "&text=" + encodeURIComponent(msg);
         linkWhatsApp.target = "_top";
         linkWhatsApp.rel = "noopener noreferrer";
         
