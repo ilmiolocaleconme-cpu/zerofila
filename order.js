@@ -5,7 +5,6 @@ const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 const TARGET_SLUG = "al-panetto";
 
-// --- FUNZIONI CARRELLO ESPORTATE ---
 export function getCartItems() {
     const saved = localStorage.getItem(`zf_cart_${TARGET_SLUG}`);
     return saved ? JSON.parse(saved) : [];
@@ -47,7 +46,6 @@ export function renderCart() {
     if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
 }
 
-// --- LOGICA DI INVIO ORDINE E MODAL ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -68,7 +66,6 @@ function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
 
-    // Recupero automatico dei dati cliente salvati in precedenza
     const salvatoNome = localStorage.getItem("zf_user_nome") || "";
     const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
 
@@ -87,8 +84,7 @@ function showOrderModal(ristorante) {
           <option value="delivery">🚀 Delivery</option>
         </select>
 
-        <!-- Sezioni condizionali: mostrate o nascoste in base alla scelta del cliente -->
-        <div id="tavolo-fields" style="display: ${tavoloDalQR || !tavoloDalQR ? 'block' : 'none'};">
+        <div id="tavolo-fields">
           <label>N° Tavolo <span class="required">*</span></label>
           <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
         </div>
@@ -113,10 +109,8 @@ function showOrderModal(ristorante) {
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     const modal = document.getElementById("order-modal");
-
     const tipoSelect = modal.querySelector("#tipo-ordine");
     
-    // Mostra solo i campi strettamente necessari in base alla modalità di consegna
     const aggiornaCampiVisibili = () => {
         const val = tipoSelect.value;
         document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
@@ -150,13 +144,12 @@ async function elaboraInvioComanda(modal, ristorante) {
         if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
 
-        // Memorizzazione persistente dei dati anagrafici sul telefono del cliente
         localStorage.setItem("zf_user_nome", nome);
         localStorage.setItem("zf_user_telefono", telefono);
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Inserimento record comanda su Supabase per lo schermo della cucina
+        // 1. Inserimento record comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -184,20 +177,19 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Importazione asincrona e pulita del file dei messaggi
+        // 2. Composizione del messaggio richiamando il modulo indipendente dei messaggi
         const moduloMessaggi = await import(`./messaggi.js?t=${Date.now()}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
         const numeroLocale = (ristorante.telefono || "393896190004").replace(/\s+/g, '');
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
 
-        // Svuota il carrello e chiude la modale grafica
         saveCart([]);
         modal.remove();
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. GENERAZIONE ED APERTURA LINK CON CLICK DIRETTO (Bypassa le protezioni del telefono)
+        // 3. GENERAZIONE ED APERTURA LINK CON CLICK DIRETTO (Infallibile su mobile)
         const linkWhatsApp = document.createElement("a");
         linkWhatsApp.href = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
         linkWhatsApp.target = "_top";
@@ -218,7 +210,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// --- CAPTURING EVENTI CLICK INTERFACCIA CARRELLO ---
+// Controlli quantità carrello
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
