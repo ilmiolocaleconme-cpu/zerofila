@@ -1,9 +1,9 @@
 import { supabaseClient } from './supabase.js';
-import { escapeHtml, formatPrice } from './utils.js';
+import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
+import { APP_VERSION } from './version.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
-const TARGET_SLUG = "al-panetto";
 
 let orderModInstance = null;
 
@@ -11,11 +11,14 @@ export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
 
+    // Rilevamento SaaS automatico: legge dall'URL, se vuoto usa al-panetto come fallback di sicurezza
+    const slug = getRistoranteSlug() || "al-panetto";
+
     try {
         const { data: ristorante, error: restError } = await supabaseClient
             .from("ristoranti")
             .select("*")
-            .eq("slug", TARGET_SLUG)
+            .eq("slug", slug)
             .single();
 
         if (restError || !ristorante) throw new Error("Locale non trovato nel database.");
@@ -69,9 +72,9 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Carica order.js forzando l'aggiornamento sulla rete
-        orderModInstance = await import(`./order.js?v=${Date.now()}`);
-        orderModInstance.renderCart();
+        // Carica il modulo d'ordine usando la versione controllata fissa
+        orderModInstance = await import(`./order.js?v=${APP_VERSION}`);
+        orderModInstance.renderCart(ristorante.id);
         orderModInstance.initOrderLogic(ristorante);
 
     } catch (err) {
@@ -80,13 +83,17 @@ export async function initMenu() {
     }
 }
 
-document.addEventListener("click", async (e) => {
+document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-add-to-cart") && orderModInstance) {
+        const dataRest = sessionStorage.getItem("zf_current_ristorante");
+        if (!dataRest) return;
+        const ristorante = JSON.parse(dataRest);
+
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         
-        let cart = orderModInstance.getCartItems();
+        let cart = orderModInstance.getCartItems(ristorante.id);
         const esistente = cart.find(item => item.id === id);
 
         if (esistente) {
@@ -100,10 +107,9 @@ document.addEventListener("click", async (e) => {
                 quantita: 1
             });
         }
-        orderModInstance.saveCart(cart);
-        orderModInstance.renderCart();
+        orderModInstance.saveCart(cart, ristorante.id);
+        orderModInstance.renderCart(ristorante.id);
     }
 });
 
-// Avvio automatico sincronizzato
 initMenu();
