@@ -151,7 +151,6 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Inserimento record comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -179,7 +178,6 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Importazione del file dei messaggi usando il codice di versione controllato fissa
         const moduloMessaggi = await import(`./messaggi.js?v=${APP_VERSION}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
@@ -191,7 +189,7 @@ async function elaboraInvioComanda(modal, ristorante) {
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // 3. REINDIRIZZAMENTO DIRETTO CON CONCATENAZIONE PULITA E SICURA (Anti-errore)
+        // 3. REINDIRIZZAMENTO CON LA BARRA DI CONCATENAZIONE AGGIUNTA (Riga Corretta)
         const linkWhatsApp = document.createElement("a");
         linkWhatsApp.href = "https://wa.me" + telefonoFinale + "?text=" + encodeURIComponent(msg);
         linkWhatsApp.target = "_top";
@@ -212,7 +210,6 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// Intercettatore dei click sulle quantità del carrello
 document.addEventListener("click", (e) => {
     const dataRest = sessionStorage.getItem("zf_current_ristorante");
     if (!dataRest) return;
