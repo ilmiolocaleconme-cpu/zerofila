@@ -1,22 +1,24 @@
 import { supabaseClient } from './supabase.js';
 import { escapeHtml, formatPrice, showToast } from './utils.js';
+import { APP_VERSION } from './version.js';
 
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
-const TARGET_SLUG = "al-panetto";
 
-export function getCartItems() {
-    const saved = localStorage.getItem(`zf_cart_${TARGET_SLUG}`);
+export function getCartItems(ristoranteId) {
+    const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
+    const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : [];
 }
 
-export function saveCart(cart) {
-    localStorage.setItem(`zf_cart_${TARGET_SLUG}`, JSON.stringify(cart || []));
+export function saveCart(cart, ristoranteId) {
+    const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
+    localStorage.setItem(key, JSON.stringify(cart || []));
 }
 
-export function renderCart() {
+export function renderCart(ristoranteId) {
     if (!cartContainer) return;
-    const cart = getCartItems();
+    const cart = getCartItems(ristoranteId);
 
     if (cart.length === 0) {
         cartContainer.innerHTML = "<p class='cart-empty'>Il carrello è vuoto</p>";
@@ -43,7 +45,7 @@ export function renderCart() {
         cartContainer.appendChild(div);
     });
 
-    if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
+    if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
 export function initOrderLogic(ristorante) {
@@ -53,7 +55,7 @@ export function initOrderLogic(ristorante) {
         const newBtnProcedi = document.getElementById("send-order");
         
         newBtnProcedi.addEventListener("click", () => {
-            if (getCartItems().length === 0) {
+            if (getCartItems(ristorante.id).length === 0) {
                 showToast("Il carrello è vuoto!", "error");
                 return;
             }
@@ -130,7 +132,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     confirmBtn.textContent = "Invio in corso...";
 
     try {
-        const cart = getCartItems();
+        const cart = getCartItems(ristorante.id);
         if (cart.length === 0) throw new Error("Carrello vuoto");
 
         const nome = modal.querySelector("#cliente-nome").value.trim();
@@ -149,6 +151,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
+        // 1. Inserimento record comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -176,20 +179,21 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        const moduloMessaggi = await import(`./messaggi.js?t=${Date.now()}`);
+        // 2. Importazione del file dei messaggi usando il codice di versione controllato fissa
+        const moduloMessaggi = await import(`./messaggi.js?v=${APP_VERSION}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        // Corretto l'errore di battitura sulla variabile
         const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
-        const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
+        const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        saveCart([]);
+        saveCart([], ristorante.id);
         modal.remove();
-        renderCart();
+        renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
+        // 3. REINDIRIZZAMENTO DIRETTO CON CONCATENAZIONE PULITA E SICURA (Anti-errore)
         const linkWhatsApp = document.createElement("a");
-        linkWhatsApp.href = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
+        linkWhatsApp.href = "https://wa.me" + telefonoFinale + "?text=" + encodeURIComponent(msg);
         linkWhatsApp.target = "_top";
         linkWhatsApp.rel = "noopener noreferrer";
         
@@ -208,21 +212,26 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
+// Intercettatore dei click sulle quantità del carrello
 document.addEventListener("click", (e) => {
+    const dataRest = sessionStorage.getItem("zf_current_ristorante");
+    if (!dataRest) return;
+    const ristorante = JSON.parse(dataRest);
+
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
-        let cart = getCartItems();
+        let cart = getCartItems(ristorante.id);
         const item = cart.find(i => i.carrelloId === cid);
         if (item) {
             item.quantita += 1;
-            saveCart(cart);
-            renderCart();
+            saveCart(cart, ristorante.id);
+            renderCart(ristorante.id);
         }
     }
 
     if (e.target.classList.contains("btn-cart-meno")) {
         const cid = e.target.getAttribute("data-cid");
-        let cart = getCartItems();
+        let cart = getCartItems(ristorante.id);
         const itemIndex = cart.findIndex(i => i.carrelloId === cid);
         if (itemIndex !== -1) {
             if (cart[itemIndex].quantita > 1) {
@@ -230,8 +239,8 @@ document.addEventListener("click", (e) => {
             } else {
                 cart.splice(itemIndex, 1);
             }
-            saveCart(cart);
-            renderCart();
+            saveCart(cart, ristorante.id);
+            renderCart(ristorante.id);
         }
     }
 });
