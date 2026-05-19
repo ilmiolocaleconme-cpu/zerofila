@@ -1,16 +1,31 @@
-// Forza il browser a ignorare la vecchia cache per tutti i moduli collegati
-const timestampSaaS = Date.now();
+/**
+ * ZeroFila - Coordinatore Generale SaaS (Sincronizzato Anti-Cache)
+ */
+async function avviaApplicazioneZeroFila() {
+    try {
+        // 1. Forza il browser a verificare la freschezza dei file di modulo sulla rete
+        const moduloMenu = await import('./menu.js');
+        const moduloOrdine = await import('./order.js');
 
-Promise.all([
-    import(`./supabase.js?t=${timestampSaaS}`),
-    import(`./utils.js?t=${timestampSaaS}`),
-    import(`./menu.js?t=${timestampSaaS}`),
-    import(`./order.js?t=${timestampSaaS}`)
-]).then(([supabaseMod, utilsMod, menuMod, orderMod]) => {
-    console.log("✅ ZeroFila: moduli caricati in sincrono senza cache.");
-    
-    // Avvia l'inizializzazione del menu corretta
-    menuMod.initMenu();
-}).catch(err => {
-    console.error("Errore critico di iniezione moduli:", err);
-});
+        console.log("✅ ZeroFila: Moduli caricati correttamente.");
+
+        // 2. Avvia l'inizializzazione del menu cliente
+        if (moduloMenu && typeof moduloMenu.initMenu === "function") {
+            moduloMenu.initMenu();
+        } else {
+            console.error("Errore: La funzione initMenu non è esportata correttamente.");
+        }
+
+    } catch (err) {
+        console.error("Errore critico di iniezione moduli SaaS:", err);
+        
+        // Se il browser si blocca per colpa della vecchia cache, esegui un hard reset automatico una sola volta
+        if (!sessionStorage.getItem("zf_forced_refresh")) {
+            sessionStorage.setItem("zf_forced_refresh", "true");
+            window.location.reload(true);
+        }
+    }
+}
+
+// Avvio immediato controllato
+avviaApplicazioneZeroFila();
