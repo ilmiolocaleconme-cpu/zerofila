@@ -5,6 +5,7 @@ const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 const TARGET_SLUG = "al-panetto";
 
+// --- GESTIONE CORE STORAGE CARRELLO ---
 export function getCartItems() {
     const saved = localStorage.getItem(`zf_cart_${TARGET_SLUG}`);
     return saved ? JSON.parse(saved) : [];
@@ -46,9 +47,11 @@ export function renderCart() {
     if (cartTotalElement) cartTotalElement.textContent = `€ ${formatPrice(totale)}`;
 }
 
+// --- INIZIALIZZAZIONE LOGICA ORDINI E AGGANCIO PULSANTE ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
+        // Previene la duplicazione dei listener durante i re-render del menu
         btnProcedi.replaceWith(btnProcedi.cloneNode(true));
         const newBtnProcedi = document.getElementById("send-order");
         
@@ -62,10 +65,12 @@ export function initOrderLogic(ristorante) {
     }
 }
 
+// --- RENDERING GRAFICO MODALE DI CASSA ---
 function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
 
+    // Recupero dati anagrafici salvati localmente (Funzionalità Richiesta)
     const salvatoNome = localStorage.getItem("zf_user_nome") || "";
     const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
 
@@ -84,6 +89,7 @@ function showOrderModal(ristorante) {
           <option value="delivery">🚀 Delivery</option>
         </select>
 
+        <!-- Mostra o nasconde solo i campi che servono (Funzionalità Richiesta) -->
         <div id="tavolo-fields">
           <label>N° Tavolo <span class="required">*</span></label>
           <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
@@ -111,6 +117,7 @@ function showOrderModal(ristorante) {
     const modal = document.getElementById("order-modal");
     const tipoSelect = modal.querySelector("#tipo-ordine");
     
+    // Funzione interna per mostrare solo i dati strettamente necessari (Ogni modalità vede solo i suoi campi)
     const aggiornaCampiVisibili = () => {
         const val = tipoSelect.value;
         document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
@@ -124,6 +131,7 @@ function showOrderModal(ristorante) {
     modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
 }
 
+// --- LOGICA INTERNA TRANSAZIONE DATABASE E WHATSAPP ---
 async function elaboraInvioComanda(modal, ristorante) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
@@ -144,12 +152,13 @@ async function elaboraInvioComanda(modal, ristorante) {
         if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
 
+        // Salvataggio permanente dei dati anagrafici del cliente sul suo smartphone (Funzionalità Richiesta)
         localStorage.setItem("zf_user_nome", nome);
         localStorage.setItem("zf_user_telefono", telefono);
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Inserimento record comanda su Supabase
+        // 1. Scrittura record comanda su Supabase per i monitor cucina
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -168,6 +177,7 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
+        // Inserimento dettagli prodotti ordinati su Supabase
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -177,19 +187,21 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Composizione del messaggio richiamando il modulo indipendente dei messaggi
+        // 2. Importazione dinamica del file dei messaggi con azzeramento cache chirurgico
         const moduloMessaggi = await import(`./messaggi.js?t=${Date.now()}`);
         const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        const numeroLocale = (ristorante.telefono || "393896190004").replace(/\s+/g, '');
+        // Controllo di sicurezza e normalizzazione sul numero di telefono del ristorante
+        const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : `39${numeroLocale}`;
 
+        // Pulizia interfaccia prima del salto
         saveCart([]);
         modal.remove();
         renderCart();
         showToast("✅ Ordine registrato!");
 
-        // 3. GENERAZIONE ED APERTURA LINK CON CLICK DIRETTO (Infallibile su mobile)
+        // 3. GENERAZIONE ED APERTURA LINK CON ANCORAGGIO VIRTUALE (Infallibile contro i blocchi pop-up)
         const linkWhatsApp = document.createElement("a");
         linkWhatsApp.href = `https://wa.me{telefonoFinale}?text=${encodeURIComponent(msg)}`;
         linkWhatsApp.target = "_top";
@@ -210,7 +222,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// Controlli quantità carrello
+// --- EVENTI CLICK QUANTITÀ NELLA SIDEBAR ---
 document.addEventListener("click", (e) => {
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
