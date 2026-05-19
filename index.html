@@ -30,14 +30,13 @@
     </aside>
   </div>
 
-  <!-- Distrugge la cache dello smartphone del cliente in automatico -->
-  <script>
-    (function() {
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = `menu.js?v=${Date.now()}`;
-      document.body.appendChild(script);
-    })();
+  <!-- Iniezione professionale controllata: massima velocità, zero sprechi su Supabase -->
+  <script type="module">
+    import { APP_VERSION } from './version.js';
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = `menu.js?v=${APP_VERSION}`;
+    document.body.appendChild(script);
   </script>
 
 </body>
