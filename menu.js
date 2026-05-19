@@ -1,10 +1,10 @@
 import { supabaseClient } from './supabase.js';
-import { escapeHtml, formatPrice, showToast } from './utils.js';
+import { escapeHtml, formatPrice } from './utils.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
-
 const TARGET_SLUG = "al-panetto";
+
 let orderModInstance = null;
 
 export async function initMenu() {
@@ -69,7 +69,8 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        orderModInstance = await import(`./order.js?t=${Date.now()}`);
+        // Carica order.js forzando l'aggiornamento sulla rete
+        orderModInstance = await import(`./order.js?v=${Date.now()}`);
         orderModInstance.renderCart();
         orderModInstance.initOrderLogic(ristorante);
 
@@ -79,7 +80,7 @@ export async function initMenu() {
     }
 }
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart") && orderModInstance) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
@@ -101,6 +102,8 @@ document.addEventListener("click", (e) => {
         }
         orderModInstance.saveCart(cart);
         orderModInstance.renderCart();
-        showToast(`Aggiunto: ${nome}`);
     }
 });
+
+// Avvio automatico sincronizzato
+initMenu();
