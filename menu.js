@@ -5,6 +5,9 @@ const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
 const TARGET_SLUG = "al-panetto";
 
+// Variabile di modulo per memorizzare l'istanza corretta e sincronizzata di order.js
+let orderModInstance = null;
+
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -67,10 +70,10 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Inizializza i moduli indipendenti del carrello e dell'ordine passando il ristorante
-        const orderMod = await import(`./order.js?t=${Date.now()}`);
-        orderMod.renderCart();
-        orderMod.initOrderLogic(ristorante);
+        // IMPORTAZIONE UNICA SINCRONIZZATA ALL'AVVIO: Distrugge la cache e preserva le variabili
+        orderModInstance = await import(`./order.js?t=${Date.now()}`);
+        orderModInstance.renderCart();
+        orderModInstance.initOrderLogic(ristorante);
 
     } catch (err) {
         console.error(err);
@@ -78,15 +81,14 @@ export async function initMenu() {
     }
 }
 
-// Intercettatore dei click sui prodotti
-document.addEventListener("click", async (e) => {
-    if (e.target.classList.contains("btn-add-to-cart")) {
+// Intercettatore dei click sui prodotti (Usa l'istanza condivisa)
+document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("btn-add-to-cart") && orderModInstance) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         
-        const orderMod = await import(`./order.js?t=${Date.now()}`);
-        let cart = orderMod.getCartItems();
+        let cart = orderModInstance.getCartItems();
         const esistente = cart.find(item => item.id === id);
 
         if (esistente) {
@@ -100,7 +102,7 @@ document.addEventListener("click", async (e) => {
                 quantita: 1
             });
         }
-        orderMod.saveCart(cart);
-        orderMod.renderCart();
+        orderModInstance.saveCart(cart);
+        orderModInstance.renderCart();
     }
 });
