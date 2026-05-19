@@ -10,11 +10,13 @@ const statusDiv = document.getElementById("status");
 const qrPreviewBox = document.getElementById("qr-preview-box");
 const titleQrBox = document.getElementById("title-qr-box");
 
+// Elementi di iniezione dei link automatici
+const linksBox = document.getElementById("links-ristoratore-box");
+const linkUtenteTarget = document.getElementById("link-utente-target");
+const linkCucinaTarget = document.getElementById("link-cucina-target");
+
 let listaLocaliCompleta = [];
 
-/**
- * Recupera l'elenco completo dei ristoranti inseriti nel SaaS per popolare il menu a tendina
- */
 async function caricaRistoranti() {
     try {
         const { data: ristoranti, error } = await supabaseClient
@@ -38,27 +40,21 @@ async function caricaRistoranti() {
     }
 }
 
-/**
- * Gestisce l'upload sicuro del Logo aziendale nel bucket pubblico 'assets' di Supabase
- */
 async function uploadLogoA_Storage(file, locale) {
     const fileExt = file.name.split('.').pop();
     const fileName = `${locale.slug}-logo-${Date.now()}.${fileExt}`;
     const filePath = `loghi/${fileName}`;
 
-    // Upload fisico del file binary nel bucket di Supabase
     const { error: uploadError } = await supabaseClient.storage
         .from('assets')
         .upload(filePath, file);
 
     if (uploadError) throw uploadError;
 
-    // Estrazione dell'URL pubblico definitivo generato dal CDN
     const { data } = supabaseClient.storage
         .from('assets')
         .getPublicUrl(filePath);
 
-    // Salva il link del logo direttamente nel record del ristorante
     const { error: updateError } = await supabaseClient
         .from("ristoranti")
         .update({ logo: data.publicUrl })
@@ -68,18 +64,13 @@ async function uploadLogoA_Storage(file, locale) {
     return data.publicUrl;
 }
 
-/**
- * Genera vettorialmente i QR Code a schermo senza subire rallentamenti di memoria
- */
 function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     qrPreviewBox.innerHTML = "";
     titleQrBox.style.display = "block";
     const hiddenGen = document.getElementById("qr-hidden-generator");
 
-    // Risolto il bug dell'interpolazione stringa: ora punta all'URL reale del menu
     const baseLink = `https://vercel.app{locale.slug}`;
 
-    // 1. Generazione del QR Code Generico (Social, Packaging, Asporto)
     if (generaGenerico === "si") {
         const card = document.createElement("div");
         card.className = "qr-card";
@@ -94,7 +85,6 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
         }, 150);
     }
 
-    // 2. Generazione controllata e sequenziale dei QR Code dei singoli tavoli sala
     if (numeroTavoli > 0) {
         for (let i = 1; i <= numeroTavoli; i++) {
             const tavoloLink = `${baseLink}&tavolo=${i}`;
@@ -105,7 +95,6 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
             cardTavolo.innerHTML = `<strong>🪑 TAVOLO ${i}</strong><br><div id="${targetId}" style="display:flex; justify-content:center; margin:10px 0;"></div><span style="font-size:0.7rem; color:var(--text-muted);">?tavolo=${i}</span>`;
             qrPreviewBox.appendChild(cardTavolo);
 
-            // Utilizziamo un micro-timeout scalato per non sovraccaricare il motore grafico del browser
             setTimeout(() => {
                 const tempDiv = document.createElement("div");
                 new QRCode(tempDiv, { text: tavoloLink, width: 150, height: 150 });
@@ -118,13 +107,9 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     }
 }
 
-/**
- * Event Listener Principale di Esecuzione Onboarding Amministratore
- */
 btnAvvia.onclick = async () => {
     const ristoranteId = selectRistorante.value;
     const logoFile = logoInput.files[0];
-    const menuFile = menuInput.files[0];
     const generaGenerico = checkQrGenerico.value;
     const numeroTavoli = parseInt(numTavoliInput.value) || 0;
 
@@ -136,71 +121,49 @@ btnAvvia.onclick = async () => {
     statusDiv.style.background = "rgba(234, 179, 8, 0.1)";
     statusDiv.style.color = "#eab308";
     statusDiv.style.border = "1px solid #eab308";
-    statusDiv.innerHTML = "⏳ Avvio configurazione avanzata SuperAdmin...<br>";
+    statusDiv.innerHTML = "⏳ Generazione configurazioni in corso...<br>";
 
     btnAvvia.disabled = true;
 
     try {
-        // STEP 1: Upload e Collegamento del Logo del ristorante
+        // 1. Attivazione ed Iniezione Automatica dei Link (Funzionalità Richiesta)
+        const urlMenuClienti = `https://vercel.app{localeSelezionato.slug}`;
+        const urlPannelloCucina = `https://vercel.app{localeSelezionato.slug}`;
+        
+        linkUtenteTarget.href = urlMenuClienti;
+        linkUtenteTarget.textContent = urlMenuClienti;
+        
+        linkCucinaTarget.href = urlPannelloCucina;
+        linkCucinaTarget.textContent = urlPannelloCucina;
+        
+        linksBox.style.display = "block"; // Mostra il riquadro grafico dei link
+
+        // 2. Upload Logo se selezionato
         if (logoFile) {
             statusDiv.innerHTML += "🖼️ Upload del logo aziendale in corso...<br>";
             await uploadLogoA_Storage(logoFile, localeSelezionato);
-            statusDiv.innerHTML += "✅ Logo inserito nello storage pubblico e collegato al locale.<br>";
+            statusDiv.innerHTML += "✅ Logo inserito nello storage e collegato.<br>";
         }
 
-        // STEP 2: Calcolo visivo dei QR Code a schermo
+        // 3. Calcolo Grafico dei codici QR Code
         if (generaGenerico === "si" || numeroTavoli > 0) {
             statusDiv.innerHTML += "📐 Generazione grafica del QR-Kit in corso...<br>";
             generaQrKitGrafico(localeSelezionato, generaGenerico, numeroTavoli);
             statusDiv.innerHTML += "✅ QR Code pronti e visualizzati a schermo.<br>";
         }
 
-        // STEP 3: Spinta dell'immagine del menù verso l'AI Parser per la digitalizzazione
-        if (menuFile) {
-            statusDiv.innerHTML += "🧠 Invio immagine all'AI per la digitalizzazione del listino... (Attendi circa 10-15 secondi)<br>";
-            
-            const reader = new FileReader();
-            reader.readAsDataURL(menuFile);
-            reader.onloadend = async () => {
-                const base64String = reader.result.split(',')[1];
-
-                try {
-                    // Chiamata all'endpoint Edge Function di Supabase
-                    const response = await fetch("https://supabase.co", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            ristorante_id: ristoranteId,
-                            immagine_base64: base64String
-                        })
-                    });
-
-                    const result = await response.json();
-                    
-                    if (response.ok && result.status === "success") {
-                        mostraSuccessoFinale();
-                    } else {
-                        throw new Error(result.error || "Errore scrittura record menu.");
-                    }
-                } catch (apiErr) {
-                    mostraErroreFinale(apiErr.message);
-                }
-            };
-        } else {
-            mostraSuccessoFinale();
-        }
+        mostraSuccessoFinale();
 
     } catch (err) {
         mostraErroreFinale(err.message);
     }
 };
 
-// --- FUNZIONI DI CONCLUSIONE INTERFACCIA (RIPRISTINATE E COMPLETATE) ---
 function mostraSuccessoFinale() {
     statusDiv.style.background = "rgba(16, 185, 129, 0.1)";
     statusDiv.style.color = "#10b981";
     statusDiv.style.border = "1px solid #10b981";
-    statusDiv.innerHTML += "🚀 <strong>Onboarding completato con successo! All systems nominal.</strong><br>";
+    statusDiv.innerHTML += "🚀 <strong>Onboarding completato! Collegamenti pronti.</strong><br>";
     btnAvvia.disabled = false;
 }
 
@@ -209,9 +172,8 @@ function mostraErroreFinale(messaggio) {
     statusDiv.style.background = "rgba(239, 68, 68, 0.1)";
     statusDiv.style.color = "#ef4444";
     statusDiv.style.border = "1px solid #ef4444";
-    statusDiv.innerHTML += `❌ <strong>ERRORE PROCEDURA:</strong> ${messaggio}<br>`;
+    statusDiv.innerHTML += `❌ <strong>ERRORE:</strong> ${messaggio}<br>`;
     btnAvvia.disabled = false;
 }
 
-// Avvio automatico al caricamento
 caricaRistoranti();
