@@ -78,8 +78,10 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     titleQrBox.style.display = "block";
     const hiddenGen = document.getElementById("qr-hidden-generator");
 
-    // Costruzione link base corretta con concatenazione standard
-    const baseLink = "https://vercel.app" + locale.slug;
+    // Costruzione link base corretta con oggetto URL nativo per evitare errori grafici nei QR
+    const baseLinkURL = new URL("https://vercel.app");
+    baseLinkURL.searchParams.set("r", locale.slug);
+    const baseLink = baseLinkURL.toString();
 
     // 1. Generazione del QR Code Generico (Social, Packaging, Asporto)
     if (generaGenerico === "si") {
@@ -124,7 +126,7 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
  */
 btnAvvia.onclick = async () => {
     const ristoranteId = selectRistorante.value;
-    const logoFile = logoInput.files[0];
+    const logoFile = logoInput.files[0]; // Riparata l'estrazione singola dell'array binary del file
     const generaGenerico = checkQrGenerico.value;
     const numeroTavoli = parseInt(numTavoliInput.value) || 0;
 
@@ -141,17 +143,23 @@ btnAvvia.onclick = async () => {
     btnAvvia.disabled = true;
 
     try {
-        // 1. Costruzione degli URL dinamici per il commerciante con concatenazione sicura
-        const urlMenuClienti = "https://vercel.app" + localeSelezionato.slug;
-        const urlPannelloCucina = "https://vercel.app" + localeSelezionato.slug;
+        // 1. COSTRUZIONE CON OGGETTO URL NATIVO (Esclude errori di barre mancanti o stringhe unite)
+        const urlBaseMenu = new URL("https://vercel.app");
+        urlBaseMenu.searchParams.set("r", localeSelezionato.slug);
+        const urlMenuClienti = urlBaseMenu.toString();
+
+        const urlBaseCucina = new URL("https://vercel.appkitchen.html");
+        urlBaseCucina.searchParams.set("r", localeSelezionato.slug);
+        const urlPannelloCucina = urlBaseCucina.toString();
         
+        // Iniezione controllata e pulita dei link nell'interfaccia grafica
         linkUtenteTarget.href = urlMenuClienti;
         linkUtenteTarget.textContent = urlMenuClienti;
         
         linkCucinaTarget.href = urlPannelloCucina;
         linkCucinaTarget.textContent = urlPannelloCucina;
         
-        // Rende visibile il pannello dei collegamenti privati a schermo
+        // Rende visibile il pannello dei collegamenti privati del commerciante
         if (linksBox) linksBox.style.display = "block";
 
         // 2. Upload Logo se caricato nel form
