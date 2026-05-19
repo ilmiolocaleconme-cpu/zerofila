@@ -1,18 +1,15 @@
 import { supabaseClient } from './supabase.js';
-import { escapeHtml, formatPrice, showToast } from './utils.js';
+import { escapeHtml, formatPrice } from './utils.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
-
-// Costante fissa SaaS per il locale corrente
 const TARGET_SLUG = "al-panetto";
 
-async function initMenu() {
+export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
 
     try {
-        // Estrazione record ristorante
         const { data: ristorante, error: restError } = await supabaseClient
             .from("ristoranti")
             .select("*")
@@ -24,7 +21,6 @@ async function initMenu() {
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
         if (restNameHeader) restNameHeader.textContent = ristorante.nome;
 
-        // Recupero simultaneo categorie e prodotti
         const [catRes, prodRes] = await Promise.all([
             supabaseClient.from("categorie").select("*").eq("ristorante_id", ristorante.id).order("ordine", { ascending: true }),
             supabaseClient.from("prodotti").select("*").eq("ristorante_id", ristorante.id).eq("disponibile", true).order("ordine", { ascending: true })
@@ -33,7 +29,6 @@ async function initMenu() {
         if (catRes.error) throw catRes.error;
         if (prodRes.error) throw prodRes.error;
 
-        // Rendering Interfaccia Menu
         menuContainer.innerHTML = "";
         const categorie = catRes.data || [];
         const prodotti = prodRes.data || [];
@@ -72,10 +67,10 @@ async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // IMPORTAZIONE DINAMICA DI ORDER.JS CON RESET DELLA CACHE AUTOMATICO
-        const moduloOrdine = await import(`./order.js?t=${Date.now()}`);
-        moduloOrdine.renderCart();
-        moduloOrdine.initOrderLogic(ristorante);
+        // Inizializza i moduli indipendenti del carrello e dell'ordine passando il ristorante
+        const orderMod = await import(`./order.js?t=${Date.now()}`);
+        orderMod.renderCart();
+        orderMod.initOrderLogic(ristorante);
 
     } catch (err) {
         console.error(err);
@@ -83,34 +78,29 @@ async function initMenu() {
     }
 }
 
-// --- CAPTURING EVENTI CLICK PRODOTTI ---
-document.addEventListener("click", (e) => {
+// Intercettatore dei click sui prodotti
+document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart")) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         
-        // Importazione dinamica al volo per usare le funzioni del carrello
-        import(`./order.js?t=${Date.now()}`).then((modulo) => {
-            let cart = modulo.getCartItems();
-            const esistente = cart.find(item => item.id === id);
+        const orderMod = await import(`./order.js?t=${Date.now()}`);
+        let cart = orderMod.getCartItems();
+        const esistente = cart.find(item => item.id === id);
 
-            if (esistente) {
-                esistente.quantita += 1;
-            } else {
-                cart.push({
-                    carrelloId: crypto.randomUUID(),
-                    id: id,
-                    nome: nome,
-                    prezzo: prezzo,
-                    quantita: 1
-                });
-            }
-            modulo.saveCart(cart);
-            modulo.renderCart();
-            showToast(`Aggiunto: ${nome}`);
-        });
+        if (esistente) {
+            esistente.quantita += 1;
+        } else {
+            cart.push({
+                carrelloId: crypto.randomUUID(),
+                id: id,
+                nome: nome,
+                prezzo: prezzo,
+                quantita: 1
+            });
+        }
+        orderMod.saveCart(cart);
+        orderMod.renderCart();
     }
 });
-
-initMenu();
