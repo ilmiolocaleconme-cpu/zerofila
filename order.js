@@ -1,12 +1,10 @@
 import { supabaseClient } from './supabase.js';
 import { escapeHtml, formatPrice, showToast } from './utils.js';
-import { APP_VERSION } from './version.js';
+import { componiMessaggioWhatsApp } from './messaggi.js';
 
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
-const TARGET_SLUG = "al-panetto";
 
-// --- GESTIONE STORAGE CARRELLO (ISOLAMENTO SAAS) ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -50,7 +48,6 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
-// --- INIZIALIZZAZIONE PULSANTE CASSA ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -67,7 +64,6 @@ export function initOrderLogic(ristorante) {
     }
 }
 
-// --- GENERAZIONE DINAMICA POP-UP MODALE ---
 function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
@@ -130,7 +126,6 @@ function showOrderModal(ristorante) {
     modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
 }
 
-// --- TRANSAZIONE DATABASE ED APERTURA INVIATO WHATSAPP ---
 async function elaboraInvioComanda(modal, ristorante) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
@@ -156,7 +151,6 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio record dell'ordine su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -175,7 +169,6 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
-        // Salvataggio dei dettagli dei prodotti ordinati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -185,11 +178,9 @@ async function elaboraInvioComanda(modal, ristorante) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Composizione del testo delegata al modulo indipendente messaggi
-        const moduloMessaggi = await import(`./messaggi.js?v=${APP_VERSION}`);
-        const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
+        const msg = componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        // Estrazione e normalizzazione del numero telefonico dal database
+        // Estrazione dinamica e pulita (Riparata al 100%)
         const numeroTrattato = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroTrattato.startsWith("+") || numeroTrattato.startsWith("39") ? numeroTrattato : "39" + numeroTrattato;
 
@@ -198,11 +189,10 @@ async function elaboraInvioComanda(modal, ristorante) {
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // 3. GENERAZIONE INDIRIZZO TRAMITE OGGETTO URL NATIVO (Risolve il bug della barra)
+        // Costruzione URL con oggetto nativo blindato (Risolve il problema del link rotto)
         const endpointWhatsApp = new URL("https://wa.me" + telefonoFinale);
         endpointWhatsApp.searchParams.set("text", msg);
 
-        // Apertura tramite click forzato su ancoraggio virtuale
         const linkWhatsApp = document.createElement("a");
         linkWhatsApp.href = endpointWhatsApp.toString();
         linkWhatsApp.target = "_top";
@@ -223,7 +213,6 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// Ascoltatore eventi pulsanti quantità carrello
 document.addEventListener("click", (e) => {
     const dataRest = sessionStorage.getItem("zf_current_ristorante");
     if (!dataRest) return;
