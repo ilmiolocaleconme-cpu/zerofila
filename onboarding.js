@@ -10,13 +10,16 @@ const statusDiv = document.getElementById("status");
 const qrPreviewBox = document.getElementById("qr-preview-box");
 const titleQrBox = document.getElementById("title-qr-box");
 
-// Elementi di iniezione dei link automatici
+// Elementi di iniezione dei link automatici per il commerciante
 const linksBox = document.getElementById("links-ristoratore-box");
 const linkUtenteTarget = document.getElementById("link-utente-target");
 const linkCucinaTarget = document.getElementById("link-cucina-target");
 
 let listaLocaliCompleta = [];
 
+/**
+ * Recupera l'elenco completo dei ristoranti inseriti nel SaaS per popolare il menu a tendina
+ */
 async function caricaRistoranti() {
     try {
         const { data: ristoranti, error } = await supabaseClient
@@ -40,10 +43,13 @@ async function caricaRistoranti() {
     }
 }
 
+/**
+ * Gestisce l'upload sicuro del Logo aziendale nel bucket pubblico 'assets' di Supabase
+ */
 async function uploadLogoA_Storage(file, locale) {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${locale.slug}-logo-${Date.now()}.${fileExt}`;
-    const filePath = `loghi/${fileName}`;
+    const fileName = locale.slug + "-logo-" + Date.now() + "." + fileExt;
+    const filePath = "loghi/" + fileName;
 
     const { error: uploadError } = await supabaseClient.storage
         .from('assets')
@@ -64,17 +70,22 @@ async function uploadLogoA_Storage(file, locale) {
     return data.publicUrl;
 }
 
+/**
+ * Genera vettorialmente i QR Code a schermo senza subire rallentamenti di memoria
+ */
 function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     qrPreviewBox.innerHTML = "";
     titleQrBox.style.display = "block";
     const hiddenGen = document.getElementById("qr-hidden-generator");
 
-    const baseLink = `https://vercel.app{locale.slug}`;
+    // Costruzione link base corretta con concatenazione standard
+    const baseLink = "https://vercel.app" + locale.slug;
 
+    // 1. Generazione del QR Code Generico (Social, Packaging, Asporto)
     if (generaGenerico === "si") {
         const card = document.createElement("div");
         card.className = "qr-card";
-        card.innerHTML = `<strong>🔗 QR GENERICO</strong><br><div id="qr-gen-target" style="display:flex; justify-content:center; margin:10px 0;"></div><span style="font-size:0.7rem; color:var(--color-pronto);">${locale.slug}</span>`;
+        card.innerHTML = "<strong>🔗 QR GENERICO</strong><br><div id='qr-gen-target' style='display:flex; justify-content:center; margin:10px 0;'></div><span style='font-size:0.7rem; color:var(--color-pronto);'>" + locale.slug + "</span>";
         qrPreviewBox.appendChild(card);
         
         hiddenGen.innerHTML = "";
@@ -85,14 +96,15 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
         }, 150);
     }
 
+    // 2. Generazione controllata e sequenziale dei QR Code dei singoli tavoli sala
     if (numeroTavoli > 0) {
         for (let i = 1; i <= numeroTavoli; i++) {
-            const tavoloLink = `${baseLink}&tavolo=${i}`;
+            const tavoloLink = baseLink + "&tavolo=" + i;
             const cardTavolo = document.createElement("div");
             cardTavolo.className = "qr-card";
             
-            const targetId = `qr-tavolo-target-${i}`;
-            cardTavolo.innerHTML = `<strong>🪑 TAVOLO ${i}</strong><br><div id="${targetId}" style="display:flex; justify-content:center; margin:10px 0;"></div><span style="font-size:0.7rem; color:var(--text-muted);">?tavolo=${i}</span>`;
+            const targetId = "qr-tavolo-target-" + i;
+            cardTavolo.innerHTML = "<strong>🪑 TAVOLO " + i + "</strong><br><div id='" + targetId + "' style='display:flex; justify-content:center; margin:10px 0;'></div><span style='font-size:0.7rem; color:var(--text-muted);'>?tavolo=" + i + "</span>";
             qrPreviewBox.appendChild(cardTavolo);
 
             setTimeout(() => {
@@ -107,6 +119,9 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     }
 }
 
+/**
+ * Event Listener Principale di Esecuzione Onboarding Amministratore (Versione Gratuita)
+ */
 btnAvvia.onclick = async () => {
     const ristoranteId = selectRistorante.value;
     const logoFile = logoInput.files[0];
@@ -126,9 +141,9 @@ btnAvvia.onclick = async () => {
     btnAvvia.disabled = true;
 
     try {
-        // 1. Attivazione ed Iniezione Automatica dei Link (Funzionalità Richiesta)
-        const urlMenuClienti = `https://vercel.app{localeSelezionato.slug}`;
-        const urlPannelloCucina = `https://vercel.app{localeSelezionato.slug}`;
+        // 1. Costruzione degli URL dinamici per il commerciante con concatenazione sicura
+        const urlMenuClienti = "https://vercel.app" + localeSelezionato.slug;
+        const urlPannelloCucina = "https://vercel.app" + localeSelezionato.slug;
         
         linkUtenteTarget.href = urlMenuClienti;
         linkUtenteTarget.textContent = urlMenuClienti;
@@ -136,16 +151,17 @@ btnAvvia.onclick = async () => {
         linkCucinaTarget.href = urlPannelloCucina;
         linkCucinaTarget.textContent = urlPannelloCucina;
         
-        linksBox.style.display = "block"; // Mostra il riquadro grafico dei link
+        // Rende visibile il pannello dei collegamenti privati a schermo
+        if (linksBox) linksBox.style.display = "block";
 
-        // 2. Upload Logo se selezionato
+        // 2. Upload Logo se caricato nel form
         if (logoFile) {
             statusDiv.innerHTML += "🖼️ Upload del logo aziendale in corso...<br>";
             await uploadLogoA_Storage(logoFile, localeSelezionato);
-            statusDiv.innerHTML += "✅ Logo inserito nello storage e collegato.<br>";
+            statusDiv.innerHTML += "✅ Logo inserito nello storage pubblico e collegato.<br>";
         }
 
-        // 3. Calcolo Grafico dei codici QR Code
+        // 3. Generazione automatica dei codici QR a schermo
         if (generaGenerico === "si" || numeroTavoli > 0) {
             statusDiv.innerHTML += "📐 Generazione grafica del QR-Kit in corso...<br>";
             generaQrKitGrafico(localeSelezionato, generaGenerico, numeroTavoli);
@@ -163,7 +179,7 @@ function mostraSuccessoFinale() {
     statusDiv.style.background = "rgba(16, 185, 129, 0.1)";
     statusDiv.style.color = "#10b981";
     statusDiv.style.border = "1px solid #10b981";
-    statusDiv.innerHTML += "🚀 <strong>Onboarding completato! Collegamenti pronti.</strong><br>";
+    statusDiv.innerHTML += "🚀 <strong>Onboarding completato! Collegamenti pronti per il commerciante.</strong><br>";
     btnAvvia.disabled = false;
 }
 
@@ -172,8 +188,9 @@ function mostraErroreFinale(messaggio) {
     statusDiv.style.background = "rgba(239, 68, 68, 0.1)";
     statusDiv.style.color = "#ef4444";
     statusDiv.style.border = "1px solid #ef4444";
-    statusDiv.innerHTML += `❌ <strong>ERRORE:</strong> ${messaggio}<br>`;
+    statusDiv.innerHTML += "❌ <strong>ERRORE PROCEDURA:</strong> " + messaggio + "<br>";
     btnAvvia.disabled = false;
 }
 
+// Inizializzazione automatica al caricamento dello script
 caricaRistoranti();
