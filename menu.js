@@ -1,17 +1,14 @@
 import { supabaseClient } from './supabase.js';
 import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
-import { APP_VERSION } from './version.js';
+import { initOrderLogic, renderCart, getCartItems, saveCart } from './order.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
-
-let orderModInstance = null;
 
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
 
-    // Rilevamento SaaS automatico: legge dall'URL, se vuoto usa al-panetto come fallback di sicurezza
     const slug = getRistoranteSlug() || "al-panetto";
 
     try {
@@ -72,10 +69,8 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Carica il modulo d'ordine usando la versione controllata fissa
-        orderModInstance = await import(`./order.js?v=${APP_VERSION}`);
-        orderModInstance.renderCart(ristorante.id);
-        orderModInstance.initOrderLogic(ristorante);
+        renderCart(ristorante.id);
+        initOrderLogic(ristorante);
 
     } catch (err) {
         console.error(err);
@@ -84,7 +79,7 @@ export async function initMenu() {
 }
 
 document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("btn-add-to-cart") && orderModInstance) {
+    if (e.target.classList.contains("btn-add-to-cart")) {
         const dataRest = sessionStorage.getItem("zf_current_ristorante");
         if (!dataRest) return;
         const ristorante = JSON.parse(dataRest);
@@ -93,7 +88,7 @@ document.addEventListener("click", (e) => {
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         
-        let cart = orderModInstance.getCartItems(ristorante.id);
+        let cart = getCartItems(ristorante.id);
         const esistente = cart.find(item => item.id === id);
 
         if (esistente) {
@@ -107,9 +102,7 @@ document.addEventListener("click", (e) => {
                 quantita: 1
             });
         }
-        orderModInstance.saveCart(cart, ristorante.id);
-        orderModInstance.renderCart(ristorante.id);
+        saveCart(cart, ristorante.id);
+        renderCart(ristorante.id);
     }
 });
-
-initMenu();
