@@ -4,14 +4,10 @@ import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
 
-/**
- * Inizializza l'applicazione caricando le categorie e i prodotti dal database
- */
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
 
-    // Estrazione dinamica del locale (Legge dall'URL per garantire la scalabilità SaaS)
     const slug = getRistoranteSlug() || "al-panetto";
 
     try {
@@ -43,7 +39,6 @@ export async function initMenu() {
             return;
         }
 
-        // Rendering dinamico delle sezioni del menu
         categorie.forEach(cat => {
             const prods = prodotti.filter(p => p.categoria_id === cat.id);
             if (!prods.length) return;
@@ -64,7 +59,8 @@ export async function initMenu() {
                         <p>${escapeHtml(p.descrizione || '')}</p>
                         <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                     </div>
-                    <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}">➕ Aggiungi</button>
+                    <!-- Iniettiamo la descrizione direttamente come attributo sicuro -->
+                    <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}">➕ Aggiungi</button>
                 `;
                 grid.appendChild(card);
             });
@@ -73,7 +69,6 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Caricamento del modulo ordine per inizializzare cassa e carrello
         const orderMod = await import(`./order.js`);
         orderMod.renderCart(ristorante.id);
         orderMod.initOrderLogic(ristorante);
@@ -84,21 +79,14 @@ export async function initMenu() {
     }
 }
 
-/**
- * Intercettatore globale dei click: cattura la pressione di "Aggiungi" 
- * ed apre la finestra di personalizzazione degli ingredienti (+ / -)
- */
+// Intercettatore blindato: prende i dati direttamente dal pulsante senza cercare la card
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart")) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
-        
-        // Cerca la card per estrarre la stringa degli ingredienti base dalla descrizione
-        const cardinfo = e.target.closest(".prodotto-card");
-        const descrizione = cardinfo.querySelector("p")?.textContent || "";
+        const descrizione = e.target.getAttribute("data-descrizione") || "";
 
-        // Importazione dinamica per lanciare il pop-up delle varianti
         const orderMod = await import(`./order.js`);
         orderMod.apriModaleVarianti(id, nome, prezzo, descrizione);
     }
