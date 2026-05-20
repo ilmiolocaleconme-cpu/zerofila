@@ -5,25 +5,27 @@ const kitchenContainer = document.getElementById("kitchen-orders");
 const enableAudioBtn = document.getElementById("enable-audio");
 
 let currentRistorante = null;
-let lastOrderCount = 0;
-
 const audioPlayer = new Audio();
 audioPlayer.volume = 0.85;
 
 function playNewOrderSound() {
-    // URL diretto al file audio reale per attivare la notifica sonora
     audioPlayer.src = "https://mixkit.co";
-    audioPlayer.play().catch((e) => console.log("Riproduzione audio bloccata dai permessi del browser:", e));
+    audioPlayer.play().catch((e) => console.log("Audio in attesa:", e));
 }
 
 if (enableAudioBtn) {
     enableAudioBtn.addEventListener("click", () => {
         playNewOrderSound();
-        showToast("🔊 Audio cucina attivato correttamente!");
+        enableAudioBtn.textContent = "✅ AUDIO ATTIVO";
     });
 }
 
-async function loadOrders() {
+function getRistoranteSlug() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('r') || "al-panetto";
+}
+
+async function loadOrders(triggerSound = false) {
     if (!currentRistorante) return;
 
     try {
@@ -35,15 +37,13 @@ async function loadOrders() {
 
         if (error) throw error;
 
-        // Se arrivano nuove comande rispetto all'ultimo controllo, suona il Bip
-        if (ordini && ordini.length > lastOrderCount && lastOrderCount > 0) {
+        if (triggerSound) {
             playNewOrderSound();
         }
 
-        lastOrderCount = ordini ? ordini.length : 0;
         renderKitchenOrders(ordini || []);
     } catch (err) {
-        console.error("Errore caricamento ordini cucina:", err);
+        console.error("Errore caricamento ordini:", err);
     }
 }
 
@@ -58,7 +58,6 @@ function renderKitchenOrders(ordini) {
         consegnato: ordini.filter(o => o.stato === "consegnato")
     };
 
-    // Genera visivamente le 4 colonne a schermo
     Object.entries(sections).forEach(([stato, lista]) => {
         const section = document.createElement("div");
         section.className = "kitchen-section";
@@ -68,26 +67,27 @@ function renderKitchenOrders(ordini) {
         grid.className = "orders-grid";
 
         if (lista.length === 0) {
-            grid.innerHTML = `<p class="no-orders" style="color:var(--text-muted); font-size:0.85rem; padding:10px;">Nessun ordine</p>`;
+            grid.innerHTML = `<p class="no-orders">Nessun ordine</p>`;
         }
 
         lista.forEach(o => {
             const card = document.createElement("div");
-            card.className = `ordine-card stato-${o.stato}`;
+            card.className = `ordine-card`;
             card.innerHTML = `
-                <div class="card-header" style="display:flex; justify-content:between; align-items:center; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:8px;">
-                    <h3 style="margin:0; font-size:1.1rem;">#${o.id.toString().slice(-4)}</h3>
-                    <span class="badge" style="background:#334155; padding:2px 8px; border-radius:4px; font-size:0.75rem; text-transform:uppercase;">${o.tipo_ordine}</span>
+                <div class="card-header">
+                    <h3 style="margin:0;">#${o.id.toString().slice(-4)}</h3>
+                    <span class="badge">${o.tipo_ordine}</span>
                 </div>
-                <p style="margin:4px 0; font-size:0.9rem;"><strong>Cliente:</strong> ${escapeHtml(o.nome_cliente || "Anonimo")}</p>
-                ${o.tavolo ? `<p style="margin:4px 0; font-size:0.9rem;"><strong>🪑 Tavolo:</strong> ${escapeHtml(o.tavolo)}</p>` : ''}
-                ${o.indirizzo ? `<p style="margin:4px 0; font-size:0.9rem;"><strong>📍 Dom:</strong> ${escapeHtml(o.indirizzo)}</p>` : ''}
-                <ul class="prodotti-list" style="margin:10px 0; padding-left:15px; font-size:0.95rem; color:#f1f5f9;">
+                <p style="margin:4px 0;"><strong>Cliente:</strong> ${escapeHtml(o.nome_cliente || "Anonimo")}</p>
+                ${o.tavolo ? `<p style="margin:4px 0;"><strong>🪑 Tavolo:</strong> ${escapeHtml(o.tavolo)}</p>` : ''}
+                ${o.indirizzo ? `<p style="margin:4px 0;"><strong>📍 Dom:</strong> ${escapeHtml(o.indirizzo)}</p>` : ''}
+                <ul class="prodotti-list">
                     ${(o.ordine_prodotti || []).map(p => `
-                        <li>${p.quantita}x <strong>${escapeHtml(p.nome_prodotto)}</strong></li>
+                        <li>${p.quantita}x <strong>${escapeHtml(p.nome_prodotto)}</strong> ${p.modifiche ? `<br><small style="color:#eab308;">[${escapeHtml(p.modifiche)}]</small>` : ''}</li>
                     `).join('')}
                 </ul>
-                <select onchange="window.updateOrderStatus('${o.id}', this.value)" style="width:100%; padding:6px; background:#0f172a; color:#fff; border:1px solid #334155; border-radius:4px;">
+                ${o.note ? `<p style="margin:6px 0; font-size:0.85rem; color:#94a3b8; border-top:1px dashed #334155; padding-top:4px;">📝 <strong>Note:</strong> ${escapeHtml(o.note)}</p>` : ''}
+                <select onchange="window.gestisciCambioStatoCucina('${o.id}', this.value, this)" style="width:100%; padding:8px; background:#1e293b; color:#fff; border:1px solid #475569; border-radius:4px;">
                     <option value="ricevuto" ${o.stato === "ricevuto" ? "selected" : ""}>Ricevuto</option>
                     <option value="preparazione" ${o.stato === "preparazione" ? "selected" : ""}>In Preparazione</option>
                     <option value="pronto" ${o.stato === "pronto" ? "selected" : ""}>Pronto</option>
@@ -102,54 +102,74 @@ function renderKitchenOrders(ordini) {
     });
 }
 
-window.updateOrderStatus = async function(ordineId, nuovoStato) {
+window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectElement) {
     try {
-        const { error } = await supabaseClient
+        selectElement.disabled = true;
+
+        const { data: ordineAggiornato, error } = await supabaseClient
             .from("ordini")
             .update({ stato: nuovoStato })
-            .eq("id", ordineId);
+            .eq("id", ordineId)
+            .select()
+            .single();
         
         if (error) throw error;
-        loadOrders();
-        showToast("Stato ordine aggiornato!");
+        
+        if (nuovoStato === "preparazione" || nuovoStato === "pronto") {
+            const moduloMessaggi = await import(`./messaggi.js`);
+            const testoNotifica = moduloMessaggi.componiNotificaStatoWhatsApp(
+                ordineAggiornato.nome_cliente,
+                ordineAggiornato.tipo_ordine,
+                nuovoStato,
+                ordineAggiornato.tavolo,
+                ordineAggiornato.indirizzo,
+                currentRistorante.nome
+            );
+
+            const numeroCliente = ordineAggiornato.telefono.toString().replace(/\s+/g, '').replace('+', '');
+            const telefonoFinaleCliente = numeroCliente.startsWith("39") ? numeroCliente : "39" + numeroCliente;
+
+            // RIPARAZIONE RIGHE LOGICA REDIRECT NOTIFICHE A COSTO ZERO
+            const linkWhatsApp = document.createElement("a");
+            linkWhatsApp.href = "whatsapp://send?phone=" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
+            linkWhatsApp.target = "_blank"; // Apre in secondo piano o scheda separata senza distruggere la griglia
+            linkWhatsApp.rel = "noopener noreferrer";
+            
+            document.body.appendChild(linkWhatsApp);
+            linkWhatsApp.click();
+            document.body.removeChild(linkWhatsApp);
+        }
+
+        await loadOrders(false);
     } catch (err) {
         console.error(err);
-        showToast("Errore aggiornamento stato", "error");
+        selectElement.disabled = false;
+        showToast("Errore aggiornamento", "error");
     }
 };
 
 export async function initKitchen() {
-    const slug = getRistoranteSlug() || "al-panetto";
+    const slug = getRistoranteSlug();
 
     try {
-        const { data: ristorante, error: restError } = await supabaseClient
+        const { data: risto, error } = await supabaseClient
             .from("ristoranti")
             .select("*")
             .eq("slug", slug)
             .single();
 
-        if (restError || !ristorante) throw new Error("Locale non agganciato.");
+        if (error || !risto) throw new Error("Ristorante non trovato");
+        currentRistorante = risto;
         
-        currentRistorante = ristorante;
-        await loadOrders();
+        await loadOrders(false);
 
-        // Attivazione canale Realtime ufficiale per i cuochi
         supabaseClient.channel("kitchen-realtime")
-            .on("postgres_changes", {
-                event: "*",
-                schema: "public",
-                table: "ordini",
-                filter: `ristorante_id=eq.${ristorante.id}`
-            }, () => {
-                loadOrders();
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: "ristorante_id=eq." + risto.id }, () => {
+                loadOrders(true);
             })
             .subscribe();
 
     } catch (err) {
         console.error(err);
-        if (kitchenContainer) kitchenContainer.innerHTML = `<p style="color:#ef4444; padding:20px;">❌ Errore Connessione: ${err.message}</p>`;
     }
 }
-
-// Inizializzazione automatica
-initKitchen();
