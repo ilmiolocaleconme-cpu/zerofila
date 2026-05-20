@@ -4,6 +4,10 @@ import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
 
+// Variabili di modulo globali condivise per mantenere la stabilità della memoria
+let currentRistoranteObj = null;
+let orderModuleInstance = null;
+
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -19,6 +23,7 @@ export async function initMenu() {
 
         if (restError || !ristorante) throw new Error("Locale non trovato nel database.");
 
+        currentRistoranteObj = ristorante;
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
         if (restNameHeader) restNameHeader.textContent = ristorante.nome;
 
@@ -68,11 +73,11 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // CARICAMENTO SICURO DEL CARRELLO
-        const orderMod = await import(`./order.js?v=5.0.0`);
-        if (orderMod && typeof orderMod.renderCart === "function") {
-            orderMod.renderCart(ristorante.id);
-            orderMod.initOrderLogic(ristorante);
+        // IMPORTAZIONE UNICA SINCRONIZZATA ALL'AVVIO
+        orderModuleInstance = await import(`./order.js?v=6.0.0`);
+        if (orderModuleInstance && typeof orderModuleInstance.renderCart === "function") {
+            orderModuleInstance.renderCart(ristorante.id);
+            orderModuleInstance.initOrderLogic(ristorante);
         }
 
     } catch (err) {
@@ -81,17 +86,15 @@ export async function initMenu() {
     }
 }
 
-document.addEventListener("click", async (e) => {
-    if (e.target.classList.contains("btn-add-to-cart")) {
+// Intercettatore dei click sincronizzato: esclude leak di moduli asincroni rincorrenti
+document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("btn-add-to-cart") && orderModuleInstance && currentRistoranteObj) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         const descrizione = e.target.getAttribute("data-descrizione") || "";
 
-        const orderMod = await import(`./order.js?v=5.0.0`);
-        if (orderMod && typeof orderMod.apriModaleVarianti === "function") {
-            orderMod.apriModaleVarianti(id, nome, prezzo, descrizione);
-        }
+        orderModuleInstance.apriModaleVarianti(id, nome, prezzo, descrizione, currentRistoranteObj);
     }
 });
 
