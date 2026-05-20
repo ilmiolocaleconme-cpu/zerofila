@@ -4,9 +4,7 @@ import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
 
-// Variabili di modulo globali condivise per mantenere la stabilità della memoria
 let currentRistoranteObj = null;
-let orderModuleInstance = null;
 
 export async function initMenu() {
     if (!menuContainer) return;
@@ -73,11 +71,11 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // IMPORTAZIONE UNICA SINCRONIZZATA ALL'AVVIO
-        orderModuleInstance = await import(`./order.js?v=6.0.0`);
-        if (orderModuleInstance && typeof orderModuleInstance.renderCart === "function") {
-            orderModuleInstance.renderCart(ristorante.id);
-            orderModuleInstance.initOrderLogic(ristorante);
+        // Aggancio sincronizzato al carrello di order.js
+        const orderMod = await import(`./order.js?v=7.0.0`);
+        if (orderMod && typeof orderMod.renderCart === "function") {
+            orderMod.renderCart(ristorante.id);
+            orderMod.initOrderLogic(ristorante);
         }
 
     } catch (err) {
@@ -86,15 +84,98 @@ export async function initMenu() {
     }
 }
 
-// Intercettatore dei click sincronizzato: esclude leak di moduli asincroni rincorrenti
-document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("btn-add-to-cart") && orderModuleInstance && currentRistoranteObj) {
+// INTERCETTATORE UNIFICATO: Legge gli extra dinamici da Supabase e lancia la modale delle varianti
+document.addEventListener("click", async (e) => {
+    if (e.target.classList.contains("btn-add-to-cart") && currentRistoranteObj) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
-        const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
-        const descrizione = e.target.getAttribute("data-descrizione") || "";
+        const prezzoBase = parseFloat(e.target.getAttribute("data-prezzo"));
+        const descrizioneCibo = e.target.getAttribute("data-descrizione") || "";
 
-        orderModuleInstance.apriModaleVarianti(id, nome, prezzo, descrizione, currentRistoranteObj);
+        // Estrazione realtime degli ingredienti extra a costo zero dal database
+        let ingredientiExtraDalDB = [];
+        try {
+            const { data: extras } = await supabaseClient
+                .from("ingredienti_extra")
+                .select("*")
+                .eq("ristorante_id", currentRistoranteObj.id);
+            if (extras) ingredientiExtraDalDB = extras;
+        } catch (err) {
+            console.error(err);
+        }
+
+        const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
+
+        const modalHTML = `
+        <div id="variant-modal" class="modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:99999;">
+          <div style="background:#1e293b; padding:25px; border-radius:12px; width:90%; max-width:450px; border:1px solid #334155; color:white;">
+            <h3 style="margin-top:0; color:#38bdf8;">Personalizza: ${escapeHtml(nome)}</h3>
+            <p style="font-size:0.85rem; color:#94a3b8;">Scegli cosa rimuovere o aggiungere al tuo piatto.</p>
+            
+            ${ingredientiBase.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#ef4444;">❌ Rimuovi ingredienti:</h4>' : ''}
+            <div style="margin-bottom:15px;">
+                ${ingredientiBase.map((ing) => `
+                    <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
+                        <input type="checkbox" class="chk-rimozione" value="${escapeHtml(ing)}" style="margin-right:8px;"> NO ${escapeHtml(ing)}
+                    </label>
+                `).join('')}
+            </div>
+
+            ${ingredientiExtraDalDB.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#10b981;">➕ Aggiungi Extra del locale:</h4>' : ''}
+            <div style="margin-bottom:20px;">
+                ${ingredientiExtraDalDB.map((extra) => `
+                    <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
+                        <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo_extra}" style="margin-right:8px;">
+                        + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo_extra).toFixed(2)})
+                    </label>
+                `).join('')}
+            </div>
+
+            <div style="text-align:right;">
+                <button id="btn-annulla-variante" style="background:#475569; border:none; padding:8px 16px; border-radius:6px; color:white; margin-right:10px;">Annulla</button>
+                <button id="btn-conferma-variante" style="background:#10b981; border:none; padding:8px 16px; border-radius:6px; color:#0f172a; font-weight:bold;">Aggiungi 🛒</button>
+            </div>
+          </div>
+        </div>`;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        const vModal = document.getElementById("variant-modal");
+
+        vModal.querySelector("#btn-annulla-variante").onclick = () => vModal.remove();
+
+        vModal.querySelector("#btn-conferma-variante").onclick = () => {
+            let variazioniList = [];
+            let prezzoFinaleProdotto = parseFloat(prezzoBase);
+
+            vModal.querySelectorAll(".chk-rimozione:checked").forEach(chk => {
+                variazioniList.push("NO " + chk.value);
+            });
+
+            vModal.querySelectorAll(".chk-aggiunta:checked").forEach(chk => {
+                const nomeExtra = chk.getAttribute("data-nome");
+                const prezzoExtra = parseFloat(chk.getAttribute("data-prezzo"));
+                variazioniList.push("+" + nomeExtra);
+                prezzoFinaleProdotto += prezzoExtra;
+            });
+
+            const modificheStringaFinale = variazioniList.join(", ");
+
+            // Dialoga in tempo reale con le funzioni di order.js
+            import(`./order.js?v=7.0.0`).then((orderMod) => {
+                let cart = orderMod.getCartItems(currentRistoranteObj.id);
+                cart.push({
+                    carrelloId: crypto.randomUUID(),
+                    id: id,
+                    nome: nome,
+                    prezzo: prezzoFinaleProdotto,
+                    quantita: 1,
+                    modificheStr: modificheStringaFinale || null
+                });
+                orderMod.saveCart(cart, currentRistoranteObj.id);
+                orderMod.renderCart(currentRistoranteObj.id);
+                vModal.remove();
+            });
+        };
     }
 });
 
