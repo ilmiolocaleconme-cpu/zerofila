@@ -1,14 +1,17 @@
 import { supabaseClient } from './supabase.js';
 import { getRistoranteSlug, escapeHtml, formatPrice } from './utils.js';
-import { initOrderLogic, renderCart, getCartItems, saveCart } from './order.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
 
+/**
+ * Inizializza l'applicazione caricando le categorie e i prodotti dal database
+ */
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
 
+    // Estrazione dinamica del locale (Legge dall'URL per garantire la scalabilità SaaS)
     const slug = getRistoranteSlug() || "al-panetto";
 
     try {
@@ -40,6 +43,7 @@ export async function initMenu() {
             return;
         }
 
+        // Rendering dinamico delle sezioni del menu
         categorie.forEach(cat => {
             const prods = prodotti.filter(p => p.categoria_id === cat.id);
             if (!prods.length) return;
@@ -69,8 +73,10 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        renderCart(ristorante.id);
-        initOrderLogic(ristorante);
+        // Caricamento del modulo ordine per inizializzare cassa e carrello
+        const orderMod = await import(`./order.js`);
+        orderMod.renderCart(ristorante.id);
+        orderMod.initOrderLogic(ristorante);
 
     } catch (err) {
         console.error(err);
@@ -78,31 +84,22 @@ export async function initMenu() {
     }
 }
 
-document.addEventListener("click", (e) => {
+/**
+ * Intercettatore globale dei click: cattura la pressione di "Aggiungi" 
+ * ed apre la finestra di personalizzazione degli ingredienti (+ / -)
+ */
+document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart")) {
-        const dataRest = sessionStorage.getItem("zf_current_ristorante");
-        if (!dataRest) return;
-        const ristorante = JSON.parse(dataRest);
-
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         
-        let cart = getCartItems(ristorante.id);
-        const esistente = cart.find(item => item.id === id);
+        // Cerca la card per estrarre la stringa degli ingredienti base dalla descrizione
+        const cardinfo = e.target.closest(".prodotto-card");
+        const descrizione = cardinfo.querySelector("p")?.textContent || "";
 
-        if (esistente) {
-            esistente.quantita += 1;
-        } else {
-            cart.push({
-                carrelloId: crypto.randomUUID(),
-                id: id,
-                nome: nome,
-                prezzo: prezzo,
-                quantita: 1
-            });
-        }
-        saveCart(cart, ristorante.id);
-        renderCart(ristorante.id);
+        // Importazione dinamica per lanciare il pop-up delle varianti
+        const orderMod = await import(`./order.js`);
+        orderMod.apriModaleVarianti(id, nome, prezzo, descrizione);
     }
 });
