@@ -1,11 +1,19 @@
 import { supabaseClient } from './supabase.js';
 import { escapeHtml, formatPrice, showToast } from './utils.js';
+import { componiMessaggioWhatsApp } from './messaggi.js';
 
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
-const TARGET_SLUG = "al-panetto";
 
-// --- GESTIONE STORAGE CARRELLO (ISOLAMENTO MULTI-NEGOZIO) ---
+// Elenco fisso globale di ingredienti Extra a pagamento (Universale SaaS)
+const INGREDIENTI_EXTRA = [
+    { nome: "Bacon", prezzo: 1.00 },
+    { nome: "Cheddar", prezzo: 0.80 },
+    { nome: "Doppio Hamburger", prezzo: 2.50 },
+    { nome: "Burrata", prezzo: 1.50 },
+    { nome: "Pesto Pistacchio", prezzo: 1.00 }
+];
+
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -34,8 +42,18 @@ export function renderCart(ristoranteId) {
         totale += Number(item.prezzo) * item.quantita;
         const div = document.createElement("div");
         div.className = "cart-item";
+        
+        // Costruzione stringa visiva delle personalizzazioni scelte nel carrello
+        let infoModifiche = "";
+        if (item.modificheStr) {
+            infoModifiche = `<div style="font-size:0.75rem; color:#eab308; margin-top:2px;">Variazioni: ${escapeHtml(item.modificheStr)}</div>`;
+        }
+
         div.innerHTML = `
-            <span class="item-nome">${escapeHtml(item.nome)}</span>
+            <div style="flex:1;">
+                <span class="item-nome">${escapeHtml(item.nome)}</span>
+                ${infoModifiche}
+            </div>
             <div class="item-controlli">
                 <button class="btn-cart-meno" data-cid="${item.carrelloId}">-</button>
                 <span class="item-quantita">${item.quantita}</span>
@@ -49,7 +67,90 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
-// --- ATTIVAZIONE PULSANTE CASSA ---
+// --- APERTURA MODALE PERSONALIZZAZIONE PRODOTTO (+ / - INGREDIENTI) ---
+window.apriModaleVarianti = function(prodottoId, nome, prezzo Base, descrizioneCibo) {
+    // Estrae gli ingredienti base dividendo la descrizione per le virgole
+    const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
+    const ristoranteData = sessionStorage.getItem("zf_current_ristorante");
+    const ristorante = ristoranteData ? JSON.parse(ristoranteData) : null;
+
+    const modalHTML = `
+    <div id="variant-modal" class="modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:99999;">
+      <div style="background:#1e293b; padding:25px; border-radius:12px; width:90%; max-width:450px; border:1px solid #334155; color:white;">
+        <h3 style="margin-top:0; color:#38bdf8;">Personalizza: ${escapeHtml(nome)}</h3>
+        <p style="font-size:0.85rem; color:#94a3b8;">Scegli cosa rimuovere o aggiungere al tuo piatto.</p>
+        
+        <!-- Sezione Rimozioni (Ingredienti di Base) -->
+        ${ingredientiBase.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#ef4444;">❌ Rimuovi ingredienti non graditi:</h4>' : ''}
+        <div style="margin-bottom:15px;">
+            ${ingredientiBase.map((ing, index) => `
+                <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
+                    <input type="checkbox" class="chk-rimozione" value="${escapeHtml(ing)}" style="margin-right:8px;"> NO ${escapeHtml(ing)}
+                </label>
+            `).join('')}
+        </div>
+
+        <!-- Sezione Aggiunte Extra a pagamento -->
+        <h4 style="margin-bottom:5px; font-size:0.9rem; color:#10b981;">➕ Aggiungi ingredienti Extra:</h4>
+        <div style="margin-bottom:20px;">
+            ${INGREDIENTI_EXTRA.map((extra, index) => `
+                <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
+                    <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo}" style="margin-right:8px;">
+                    + ${escapeHtml(extra.nome)} (+ € ${extra.prezzo.toFixed(2)})
+                </label>
+            `).join('')}
+        </div>
+
+        <div style="text-align:right;">
+            <button id="btn-annulla-variante" style="background:#475569; border:none; padding:8px 16px; border-radius:6px; color:white; margin-right:10px;">Annulla</button>
+            <button id="btn-conferma-variante" style="background:#10b981; border:none; padding:8px 16px; border-radius:6px; color:#0f172a; font-weight:bold;">Aggiungi al carrello 🛒</button>
+        </div>
+      </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const vModal = document.getElementById("variant-modal");
+
+    vModal.querySelector("#btn-annulla-variante").onclick = () => vModal.remove();
+
+    vModal.querySelector("#btn-conferma-variante").onclick = () => {
+        let variazioniList = [];
+        let prezzoFinaleProdotto = parseFloat(prezzoBase);
+
+        // Rileva le rimozioni
+        vModal.querySelectorAll(".chk-rimozione:checked").forEach(chk => {
+            variazioniList.push("NO " + chk.value);
+        });
+
+        // Rileva gli extra e calcola il sovrapprezzo
+        vModal.querySelectorAll(".chk-aggiunta:checked").forEach(chk => {
+            const nomeExtra = chk.getAttribute("data-nome");
+            const prezzoExtra = parseFloat(chk.getAttribute("data-prezzo"));
+            variazioniList.push("+" + nomeExtra);
+            prezzoFinaleProdotto += prezzoExtra;
+        });
+
+        const modificheStringaFinale = variazioniList.join(", ");
+
+        // Inserimento definitivo nel carrello isolato SaaS
+        let cart = getCartItems(ristorante.id);
+        cart.push({
+            carrelloId: crypto.randomUUID(),
+            id: prodottoId,
+            nome: nome,
+            prezzo: prezzoFinaleProdotto,
+            quantita: 1,
+            modificheStr: modificheStringaFinale || null
+        });
+
+        saveCart(cart, ristorante.id);
+        renderCart(ristorante.id);
+        vModal.remove();
+        showToast("Prodotto personalizzato aggiunto!");
+    };
+};
+
+// --- INIZIALIZZAZIONE STRUTTURA ORDINE ---
 export function initOrderLogic(ristorante) {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -66,7 +167,6 @@ export function initOrderLogic(ristorante) {
     }
 }
 
-// --- LOGICA RENDERING MODALE POP-UP ---
 function showOrderModal(ristorante) {
     const urlParams = new URLSearchParams(window.location.search);
     const tavoloDalQR = urlParams.get('tavolo');
@@ -89,7 +189,6 @@ function showOrderModal(ristorante) {
           <option value="delivery">🚀 Delivery</option>
         </select>
 
-        <!-- Campi logistici condizionali e protetti -->
         <div id="tavolo-fields">
           <label>N° Tavolo <span class="required">*</span></label>
           <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
@@ -117,7 +216,6 @@ function showOrderModal(ristorante) {
     const modal = document.getElementById("order-modal");
     const tipoSelect = modal.querySelector("#tipo-ordine");
     
-    // Funzione per isolare i campi e mostrare solo quelli utili
     const aggiornaCampiVisibili = () => {
         const val = tipoSelect.value;
         document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
@@ -131,7 +229,6 @@ function showOrderModal(ristorante) {
     modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
 }
 
-// --- SALVATAGGIO TRANSAZIONE ED APERTURA INVIATO WHATSAPP ---
 async function elaboraInvioComanda(modal, ristorante) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
@@ -152,13 +249,11 @@ async function elaboraInvioComanda(modal, ristorante) {
         if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
 
-        // Memorizzazione persistente dei dati anagrafici del cliente sul suo telefono
         localStorage.setItem("zf_user_nome", nome);
         localStorage.setItem("zf_user_telefono", telefono);
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Inserimento record comanda su Supabase per lo schermo della cucina
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -177,21 +272,19 @@ async function elaboraInvioComanda(modal, ristorante) {
 
         if (error) throw error;
 
-        // Inserimento dettagli dei singoli prodotti ordinati
+        // Inserimento prodotti comprensivo della colonna modifiche strutturata
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
             quantita: item.quantita,
             nome_prodotto: item.nome,
-            prezzo: item.prezzo
+            prezzo: item.prezzo,
+            modifiche: item.modificheStr // <--- SALVA NEL DATABASE LE MODIFICHE SCELTE LATO CLIENT
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 2. Generazione della stringa del messaggio dal file indipendente dei messaggi
-        const moduloMessaggi = await import(`./messaggi.js`);
-        const msg = moduloMessaggi.componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
+        const msg = componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, ristorante.nome);
 
-        // Estrazione e normalizzazione del numero telefonico del ristorante salvato nel database
         const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
@@ -200,9 +293,12 @@ async function elaboraInvioComanda(modal, ristorante) {
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // 3. APERTURA CON SCHEMA DEEP-LINK NATIVO (Scavalca i browser e forza l'avvio della App WhatsApp)
+        const endpointWhatsApp = new URL("https://whatsapp.com");
+        endpointWhatsApp.searchParams.set("phone", telefonoFinale);
+        endpointWhatsApp.searchParams.set("text", msg);
+
         const linkWhatsApp = document.createElement("a");
-        linkWhatsApp.href = "whatsapp://send?phone=" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+        linkWhatsApp.href = endpointWhatsApp.toString();
         linkWhatsApp.target = "_top";
         linkWhatsApp.rel = "noopener noreferrer";
         
@@ -221,7 +317,7 @@ async function elaboraInvioComanda(modal, ristorante) {
     }
 }
 
-// --- INTERCETTATORE GENERALIZZATO CLICK QUANTITÀ SIDEBAR ---
+// Gestione quantità interni sidebar
 document.addEventListener("click", (e) => {
     const dataRest = sessionStorage.getItem("zf_current_ristorante");
     if (!dataRest) return;
