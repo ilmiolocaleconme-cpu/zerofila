@@ -86,7 +86,7 @@ function renderKitchenOrders(ordini) {
                         <li>${p.quantita}x <strong>${escapeHtml(p.nome_prodotto)}</strong> ${p.modifiche ? `<br><small style="color:#eab308;">[${escapeHtml(p.modifiche)}]</small>` : ''}</li>
                     `).join('')}
                 </ul>
-                ${o.note ? `<p style="margin:6px 0; font-size:0.85rem; color:#94a3b8; border-top:1px dashed #334155; padding-top:4px;">📝 <strong>Note:</strong> ${escapeHtml(o.note)}</p>` : ''}
+                <!-- Menu di selezione stato che attiva la notifica automatica al click -->
                 <select onchange="window.gestisciCambioStatoCucina('${o.id}', this.value, this)" style="width:100%; padding:8px; background:#1e293b; color:#fff; border:1px solid #475569; border-radius:4px;">
                     <option value="ricevuto" ${o.stato === "ricevuto" ? "selected" : ""}>Ricevuto</option>
                     <option value="preparazione" ${o.stato === "preparazione" ? "selected" : ""}>In Preparazione</option>
@@ -102,10 +102,12 @@ function renderKitchenOrders(ordini) {
     });
 }
 
+// Funzione core di transazione e notifica automatica gratuita a portata di click
 window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectElement) {
     try {
         selectElement.disabled = true;
 
+        // 1. Aggiorna lo stato dell'ordine sul database Supabase
         const { data: ordineAggiornato, error } = await supabaseClient
             .from("ordini")
             .update({ stato: nuovoStato })
@@ -115,6 +117,7 @@ window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectEl
         
         if (error) throw error;
         
+        // 2. Se lo stato diventa "In Preparazione" o "Pronto", spara la notifica WhatsApp gratis
         if (nuovoStato === "preparazione" || nuovoStato === "pronto") {
             const moduloMessaggi = await import(`./messaggi.js`);
             const testoNotifica = moduloMessaggi.componiNotificaStatoWhatsApp(
@@ -126,25 +129,23 @@ window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectEl
                 currentRistorante.nome
             );
 
+            // Pulisce e formatta il numero di telefono del cliente inserito nell'ordine
             const numeroCliente = ordineAggiornato.telefono.toString().replace(/\s+/g, '').replace('+', '');
             const telefonoFinaleCliente = numeroCliente.startsWith("39") ? numeroCliente : "39" + numeroCliente;
 
-            // RIPARAZIONE RIGHE LOGICA REDIRECT NOTIFICHE A COSTO ZERO
-            const linkWhatsApp = document.createElement("a");
-            linkWhatsApp.href = "whatsapp://send?phone=" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
-            linkWhatsApp.target = "_blank"; // Apre in secondo piano o scheda separata senza distruggere la griglia
-            linkWhatsApp.rel = "noopener noreferrer";
-            
-            document.body.appendChild(linkWhatsApp);
-            linkWhatsApp.click();
-            document.body.removeChild(linkWhatsApp);
+            // Genera il link WhatsApp Web ufficiale per il computer della cucina
+            const endpointNotifica = new URL("https://whatsapp.com");
+            endpointWhatsApp.searchParams.set("phone", telefonoFinaleCliente);
+            endpointWhatsApp.searchParams.set("text", testoNotifica);
+
+            // Apre l'invio in una nuova scheda dello schermo cucina in background senza scombinare la griglia
+            window.open(endpointNotifica.toString(), '_blank');
         }
 
         await loadOrders(false);
     } catch (err) {
         console.error(err);
         selectElement.disabled = false;
-        showToast("Errore aggiornamento", "error");
     }
 };
 
@@ -152,19 +153,20 @@ export async function initKitchen() {
     const slug = getRistoranteSlug();
 
     try {
-        const { data: risto, error } = await supabaseClient
+        const { data: ristorante, error } = await supabaseClient
             .from("ristoranti")
             .select("*")
             .eq("slug", slug)
             .single();
 
-        if (error || !risto) throw new Error("Ristorante non trovato");
-        currentRistorante = risto;
+        if (error || !ristorante) throw new Error("Ristorante non trovato");
+        currentRistorante = ristorante;
         
         await loadOrders(false);
 
+        // Ascolta solo i nuovi ordini in ingresso per evitare rallentamenti
         supabaseClient.channel("kitchen-realtime")
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: "ristorante_id=eq." + risto.id }, () => {
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: `ristorante_id=eq.${ristorante.id}` }, () => {
                 loadOrders(true);
             })
             .subscribe();
