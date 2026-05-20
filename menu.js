@@ -6,6 +6,9 @@ const restNameHeader = document.getElementById("restaurant-name");
 
 let currentRistoranteObj = null;
 
+/**
+ * Inizializza l'applicazione caricando le categorie e i prodotti dal database
+ */
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -84,7 +87,10 @@ export async function initMenu() {
     }
 }
 
-// INTERCETTATORE UNIFICATO: Legge gli extra dinamici da Supabase e lancia la modale delle varianti
+/**
+ * INTERCETTATORE UNIFICATO CON FILTRO SELETTIVO EXTRA
+ * Esclude la comparsa degli ingredienti di carne/formaggio all'interno delle bevande
+ */
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart") && currentRistoranteObj) {
         const id = e.target.getAttribute("data-id");
@@ -92,16 +98,23 @@ document.addEventListener("click", async (e) => {
         const prezzoBase = parseFloat(e.target.getAttribute("data-prezzo"));
         const descrizioneCibo = e.target.getAttribute("data-descrizione") || "";
 
-        // Estrazione realtime degli ingredienti extra a costo zero dal database
+        // Trova il blocco della sezione corrente per leggere il titolo della categoria a schermo
+        const sezioneCategoria = e.target.closest(".menu-section");
+        const nomeCategoria = sezioneCategoria ? (sezioneCategoria.querySelector(".categoria-titolo")?.textContent || "") : "";
+
         let ingredientiExtraDalDB = [];
-        try {
-            const { data: extras } = await supabaseClient
-                .from("ingredienti_extra")
-                .select("*")
-                .eq("ristorante_id", currentRistoranteObj.id);
-            if (extras) ingredientiExtraDalDB = extras;
-        } catch (err) {
-            console.error(err);
+        
+        // CONTROLLO COMMERCIALE: Se il titolo contiene "Bevande" o l'emoji 🥤, salta la lettura degli extra!
+        if (!nomeCategoria.includes("Bevande") && !nomeCategoria.includes("🥤")) {
+            try {
+                const { data: extras } = await supabaseClient
+                    .from("ingredienti_extra")
+                    .select("*")
+                    .eq("ristorante_id", currentRistoranteObj.id);
+                if (extras) ingredientiExtraDalDB = extras;
+            } catch (err) {
+                console.error("Errore lettura ingredienti extra:", err);
+            }
         }
 
         const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
@@ -160,7 +173,7 @@ document.addEventListener("click", async (e) => {
 
             const modificheStringaFinale = variazioniList.join(", ");
 
-            // Dialoga in tempo reale con le funzioni di order.js
+            // Trasferimento sicuro al modulo order.js per il rendering nel carrello laterale
             import(`./order.js?v=7.0.0`).then((orderMod) => {
                 let cart = orderMod.getCartItems(currentRistoranteObj.id);
                 cart.push({
