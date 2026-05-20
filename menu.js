@@ -6,9 +6,6 @@ const restNameHeader = document.getElementById("restaurant-name");
 
 let currentRistoranteObj = null;
 
-/**
- * Inizializza l'applicazione caricando le categorie e i prodotti dal database
- */
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -59,13 +56,19 @@ export async function initMenu() {
             prods.forEach(p => {
                 const card = document.createElement("div");
                 card.className = "prodotto-card";
+                
+                // UX Dinamica SaaS: Se c'è un gruppo extra associato e la descrizione è vuota, invita alla farcitura
+                const haGruppoOBL = p.gruppo_extra && p.gruppo_extra.trim() !== "";
+                const isNudo = haGruppoOBL && (!p.descrizione || p.descrizione.trim() === "");
+                const testoBottone = isNudo ? "🎨 Condisci" : "➕ Aggiungi";
+
                 card.innerHTML = `
                     <div class="prodotto-info">
                         <h3>${escapeHtml(p.nome)}</h3>
-                        <p>${escapeHtml(p.descrizione || '')}</p>
+                        <p>${escapeHtml(p.descrizione || 'Scegli le varianti e i condimenti al click')}</p>
                         <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                     </div>
-                    <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}">➕ Aggiungi</button>
+                    <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}" data-gruppo="${escapeHtml(p.gruppo_extra || '')}" data-forzafarcitura="${isNudo ? 'true' : 'false'}">${testoBottone}</button>
                 `;
                 grid.appendChild(card);
             });
@@ -74,7 +77,8 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        const orderMod = await import(`./order.js?v=7.0.0`);
+        // Aggancio sincrono al carrello di order.js con versione 9.5.0
+        const orderMod = await import(`./order.js?v=9.5.0`);
         if (orderMod && typeof orderMod.renderCart === "function") {
             orderMod.renderCart(ristorante.id);
             orderMod.initOrderLogic(ristorante);
@@ -86,123 +90,40 @@ export async function initMenu() {
     }
 }
 
-/**
- * INTERCETTATORE UNIFICATO CON AGGIUNTA DIRETTA INTELLIGENTE
- * Se il prodotto è una bevanda va dritto nel carrello, altrimenti apre la modale delle varianti
- */
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart") && currentRistoranteObj) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
         const prezzoBase = parseFloat(e.target.getAttribute("data-prezzo"));
-        const descrizioneCibo = e.target.getAttribute("data-descrizione") || "";
+        const descrizione = e.target.getAttribute("data-descrizione") || "";
+        const gruppoExtra = e.target.getAttribute("data-gruppo") || null;
+        const forzaFarcitura = e.target.getAttribute("data-forzafarcitura") === "true";
 
-        // Rileva la categoria per capire se è una bevanda
-        const sezioneCategoria = e.target.closest(".menu-section");
-        const nomeCategoria = sezioneCategoria ? (sezioneCategoria.querySelector(".categoria-titolo")?.textContent || "") : "";
+        const orderMod = await import(`./order.js?v=9.5.0`);
+        let cart = orderMod.getCartItems(currentRistoranteObj.id);
+        
+        const nuovoCarrelloId = crypto.randomUUID();
+        
+        cart.push({
+            carrelloId: nuovoCarrelloId,
+            id: id,
+            nome: nome,
+            prezzoOrig: prezzoBase,
+            prezzo: prezzoBase,
+            quantita: 1,
+            descrizioneBase: descrizione,
+            gruppoExtraAbbinato: gruppoExtra,
+            modificheStr: null
+        });
+        
+        orderMod.saveCart(cart, currentRistoranteObj.id);
+        orderMod.renderCart(currentRistoranteObj.id);
 
-        // SE È UNA BEVANDA: Salta la modale e aggiungi direttamente al carrello!
-        if (nomeCategoria.includes("Bevande") || nomeCategoria.includes("🥤")) {
-            const orderMod = await import(`./order.js?v=7.0.0`);
-            let cart = orderMod.getCartItems(currentRistoranteObj.id);
-            
-            cart.push({
-                carrelloId: crypto.randomUUID(),
-                id: id,
-                nome: nome,
-                prezzo: prezzoBase,
-                quantita: 1,
-                modificheStr: null // Nessuna modifica possibile per le bevande
-            });
-            
-            orderMod.saveCart(cart, currentRistoranteObj.id);
-            orderMod.renderCart(currentRistoranteObj.id);
-            return; // Interrompe l'esecuzione così la modale non si apre
+        if (forzaFarcitura) {
+            orderMod.apriModaleVarianti(nuovoCarrelloId, currentRistoranteObj.id);
+        } else {
+            showToast(`Aggiunto: ${nome}`);
         }
-
-        // SE È UN PANINO/PIZZA: Continua normalmente e apri la modale delle varianti
-        let ingredientiExtraDalDB = [];
-        try {
-            const { data: extras } = await supabaseClient
-                .from("ingredienti_extra")
-                .select("*")
-                .eq("ristorante_id", currentRistoranteObj.id);
-            if (extras) ingredientiExtraDalDB = extras;
-        } catch (err) {
-            console.error("Errore lettura ingredienti extra:", err);
-        }
-
-        const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
-
-        const modalHTML = `
-        <div id="variant-modal" class="modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:99999;">
-          <div style="background:#1e293b; padding:25px; border-radius:12px; width:90%; max-width:450px; border:1px solid #334155; color:white;">
-            <h3 style="margin-top:0; color:#38bdf8;">Personalizza: ${escapeHtml(nome)}</h3>
-            <p style="font-size:0.85rem; color:#94a3b8;">Scegli cosa rimuovere o aggiungere al tuo piatto.</p>
-            
-            ${ingredientiBase.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#ef4444;">❌ Rimuovi ingredienti:</h4>' : ''}
-            <div style="margin-bottom:15px;">
-                ${ingredientiBase.map((ing) => `
-                    <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
-                        <input type="checkbox" class="chk-rimozione" value="${escapeHtml(ing)}" style="margin-right:8px;"> NO ${escapeHtml(ing)}
-                    </label>
-                `).join('')}
-            </div>
-
-            ${ingredientiExtraDalDB.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#10b981;">➕ Aggiungi Extra del locale:</h4>' : ''}
-            <div style="margin-bottom:20px;">
-                ${ingredientiExtraDalDB.map((extra) => `
-                    <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
-                        <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo_extra}" style="margin-right:8px;">
-                        + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo_extra).toFixed(2)})
-                    </label>
-                `).join('')}
-            </div>
-
-            <div style="text-align:right;">
-                <button id="btn-annulla-variante" style="background:#475569; border:none; padding:8px 16px; border-radius:6px; color:white; margin-right:10px;">Annulla</button>
-                <button id="btn-conferma-variante" style="background:#10b981; border:none; padding:8px 16px; border-radius:6px; color:#0f172a; font-weight:bold;">Aggiungi 🛒</button>
-            </div>
-          </div>
-        </div>`;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        const vModal = document.getElementById("variant-modal");
-
-        vModal.querySelector("#btn-annulla-variante").onclick = () => vModal.remove();
-
-        vModal.querySelector("#btn-conferma-variante").onclick = () => {
-            let variazioniList = [];
-            let prezzoFinaleProdotto = parseFloat(prezzoBase);
-
-            vModal.querySelectorAll(".chk-rimozione:checked").forEach(chk => {
-                variazioniList.push("NO " + chk.value);
-            });
-
-            vModal.querySelectorAll(".chk-aggiunta:checked").forEach(chk => {
-                const nomeExtra = chk.getAttribute("data-nome");
-                const prezzoExtra = parseFloat(chk.getAttribute("data-prezzo"));
-                variazioniList.push("+" + nomeExtra);
-                prezzoFinaleProdotto += prezzoExtra;
-            });
-
-            const modificheStringaFinale = variazioniList.join(", ");
-
-            import(`./order.js?v=7.0.0`).then((orderMod) => {
-                let cart = orderMod.getCartItems(currentRistoranteObj.id);
-                cart.push({
-                    carrelloId: crypto.randomUUID(),
-                    id: id,
-                    nome: nome,
-                    prezzo: prezzoFinaleProdotto,
-                    quantita: 1,
-                    modificheStr: modificheStringaFinale || null
-                });
-                orderMod.saveCart(cart, currentRistoranteObj.id);
-                orderMod.renderCart(currentRistoranteObj.id);
-                vModal.remove();
-            });
-        };
     }
 });
 
