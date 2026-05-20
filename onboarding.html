@@ -19,7 +19,6 @@
     button:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
     #status { padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold; font-size: 0.95rem; display: none; line-height: 1.4; }
     
-    /* Box Stile di evidenza per i link del commerciante */
     .links-box { display: none; background: #0f172a; border: 1px dashed #10b981; border-radius: 10px; padding: 20px; margin-top: 20px; }
     .links-box h3 { margin-top: 0; color: #10b981; font-size: 1.1rem; }
     .link-row { background: #1e293b; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #334155; word-break: break-all; }
@@ -74,7 +73,6 @@
 
     <div id="status"></div>
     
-    <!-- BOX AUTOMATICO LINK IN PRIMO PIANO -->
     <div id="links-ristoratore-box" class="links-box">
       <h3>📋 Collegamenti Privati del Commerciante</h3>
       <p style="font-size:0.85rem; color:#94a3b8; margin:0;">Invia questi link al ristoratore. Potrà aprirli dal telefono e salvarli sulla Home come un'applicazione.</p>
@@ -96,6 +94,7 @@
     <div id="qr-preview-box"></div>
   </div>
 
-  <script type="module" src="onboarding.js"></script>
+  <!-- Iniezione forzata con parametro v=999 per distruggere la cache del telefono -->
+  <script type="module" src="onboarding.js?v=999"></script>
 </body>
 </html>
