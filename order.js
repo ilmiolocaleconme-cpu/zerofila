@@ -73,11 +73,10 @@ export function initOrderLogic(ristorante) {
     }
 }
 
-// STRUTTURA AVANZATA: Estrae gli ingredienti extra in tempo reale da Supabase in base al ristorante
+// STRUTTURA DINAMICA SINCRONIZZATA SUL CAMPO NUOVO: prezzo_extra
 window.apriModaleVarianti = async function(prodottoId, nome, prezzoBase, descrizioneCibo, ristorante) {
     if (!ristorante) return;
     
-    // Mostra un caricamento leggero mentre scarica gli extra dal DB
     showToast("Caricamento opzioni...", "info");
 
     let ingredientiExtraDalDB = [];
@@ -115,8 +114,9 @@ window.apriModaleVarianti = async function(prodottoId, nome, prezzoBase, descriz
         <div style="margin-bottom:20px;">
             ${ingredientiExtraDalDB.map((extra) => `
                 <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
-                    <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo}" style="margin-right:8px;">
-                    + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo).toFixed(2)})
+                    <!-- Mappatura precisa sul campo prezzo_extra -->
+                    <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo_extra}" style="margin-right:8px;">
+                    + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo_extra).toFixed(2)})
                 </label>
             `).join('')}
         </div>
@@ -164,6 +164,7 @@ window.apriModaleVarianti = async function(prodottoId, nome, prezzoBase, descriz
         renderCart(ristorante.id);
         vModal.remove();
         showToast("Prodotto aggiunto!");
+    
     };
 };
 
