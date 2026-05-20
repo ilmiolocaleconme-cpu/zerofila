@@ -57,7 +57,6 @@ export async function initMenu() {
                 const card = document.createElement("div");
                 card.className = "prodotto-card";
                 
-                // UX Dinamica SaaS: Se c'è un gruppo extra associato e la descrizione è vuota, invita alla farcitura
                 const haGruppoOBL = p.gruppo_extra && p.gruppo_extra.trim() !== "";
                 const isNudo = haGruppoOBL && (!p.descrizione || p.descrizione.trim() === "");
                 const testoBottone = isNudo ? "🎨 Condisci" : "➕ Aggiungi";
@@ -77,8 +76,7 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Aggancio sincrono al carrello di order.js con versione 9.5.0
-        const orderMod = await import(`./order.js?v=9.5.0`);
+        const orderMod = await import(`./order.js?v=10.0.0`);
         if (orderMod && typeof orderMod.renderCart === "function") {
             orderMod.renderCart(ristorante.id);
             orderMod.initOrderLogic(ristorante);
@@ -96,13 +94,14 @@ document.addEventListener("click", async (e) => {
         const nome = e.target.getAttribute("data-nome");
         const prezzoBase = parseFloat(e.target.getAttribute("data-prezzo"));
         const descrizione = e.target.getAttribute("data-descrizione") || "";
-        const gruppoExtra = e.target.getAttribute("data-gruppo") || null;
+        const grupoExtra = e.target.getAttribute("data-gruppo") || null;
         const forzaFarcitura = e.target.getAttribute("data-forzafarcitura") === "true";
 
-        const orderMod = await import(`./order.js?v=9.5.0`);
+        const orderMod = await import(`./order.js?v=10.0.0`);
         let cart = orderMod.getCartItems(currentRistoranteObj.id);
         
-        const nuovoCarrelloId = crypto.randomUUID();
+        // ID COMPATIBILE AL 100% SU TUTTI I TELEFONI CELLULARI (Sostituisce crypto.randomUUID)
+        const nuovoCarrelloId = "id_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
         
         cart.push({
             carrelloId: nuovoCarrelloId,
@@ -112,7 +111,7 @@ document.addEventListener("click", async (e) => {
             prezzo: prezzoBase,
             quantita: 1,
             descrizioneBase: descrizione,
-            gruppoExtraAbbinato: gruppoExtra,
+            gruppoExtraAbbinato: grupoExtra,
             modificheStr: null
         });
         
