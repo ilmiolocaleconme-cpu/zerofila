@@ -33,23 +33,32 @@ export function renderCart(ristoranteId) {
         totale += Number(item.prezzo) * item.quantita;
         const div = document.createElement("div");
         div.className = "cart-item";
+        div.style.cssText = "display:flex; flex-direction:column; padding:10px 0; border-bottom:1px solid #334155;";
         
         let infoModifiche = "";
         if (item.modificheStr) {
             infoModifiche = `<div style="font-size:0.75rem; color:#eab308; margin-top:2px;">Variazioni: ${escapeHtml(item.modificheStr)}</div>`;
         }
 
+        let bottoneModificaOBL = "";
+        if (item.gruppoExtraAbbinato && item.gruppoExtraAbbinato.trim() !== "") {
+            bottoneModificaOBL = `<button class="btn-apri-varianti" data-cid="${item.carrelloId}" data-rid="${ristoranteId}" style="background:transparent; border:none; color:#38bdf8; font-size:0.8rem; padding:0; text-align:left; cursor:pointer; margin-top:4px; font-weight:bold;">✍️ Modifica ingredienti</button>`;
+        }
+
         div.innerHTML = `
-            <div style="flex:1;">
-                <span class="item-nome">${escapeHtml(item.nome)}</span>
-                ${infoModifiche}
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                <span class="item-nome" style="font-weight:bold;">${escapeHtml(item.nome)}</span>
+                <span class="item-prezzo" style="font-weight:bold; color:#f1f5f9;">€ ${formatPrice(item.prezzo * item.quantita)}</span>
             </div>
-            <div class="item-controlli">
-                <button class="btn-cart-meno" data-cid="${item.carrelloId}" data-rid="${ristoranteId}">-</button>
-                <span class="item-quantita">${item.quantita}</span>
-                <button class="btn-cart-piu" data-cid="${item.carrelloId}" data-rid="${ristoranteId}">+</button>
+            ${infoModifiche}
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-top:6px;">
+                ${bottoneModificaOBL}
+                <div class="item-controlli" style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn-cart-meno" data-cid="${item.carrelloId}" data-rid="${ristoranteId}">-</button>
+                    <span class="item-quantita">${item.quantita}</span>
+                    <button class="btn-cart-piu" data-cid="${item.carrelloId}" data-rid="${ristoranteId}">+</button>
+                </div>
             </div>
-            <span class="item-prezzo">€ ${formatPrice(item.prezzo * item.quantita)}</span>
         `;
         cartContainer.appendChild(div);
     });
@@ -73,57 +82,91 @@ export function initOrderLogic(ristorante) {
     }
 }
 
-// STRUTTURA DINAMICA SINCRONIZZATA SUL CAMPO NUOVO: prezzo_extra
-window.apriModaleVarianti = async function(prodottoId, nome, prezzoBase, descrizioneCibo, ristorante) {
-    if (!ristorante) return;
-    
-    showToast("Caricamento opzioni...", "info");
+export async function apriModaleVarianti(carrelloId, ristoranteId) {
+    let cart = getCartItems(ristoranteId);
+    const item = cart.find(i => i.carrelloId === carrelloId);
+    if (!item || !item.gruppoExtraAbbinato) return;
 
-    let ingredientiExtraDalDB = [];
+    showToast("Lettura banco condimenti...", "info");
+
+    let opzioniSingole = [];
+    let opzioniMultipleGratis = [];
+    let opzioniMultipleExtra = [];
+
     try {
         const { data: extras, error } = await supabaseClient
             .from("ingredienti_extra")
             .select("*")
-            .eq("ristorante_id", ristorante.id);
+            .eq("ristorante_id", ristoranteId)
+            .eq("gruppo_extra", item.gruppoExtraAbbinato)
+            .order("nome", { ascending: true });
         
         if (!error && extras) {
-            ingredientiExtraDalDB = extras;
+            opzioniSingole = extras.filter(e => e.tipo_selezione === 'singola');
+            const multiple = extras.filter(e => e.tipo_selezione !== 'singola');
+            opzioniMultipleGratis = multiple.filter(e => Number(e.prezzo_extra) === 0);
+            opzioniMultipleExtra = multiple.filter(e => Number(e.prezzo_extra) > 0);
         }
     } catch (e) {
-        console.error("Errore recupero extra:", e);
+        console.error(e);
     }
 
-    const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
+    const ingredientiBase = item.descrizioneBase ? item.descrizioneBase.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
 
     const modalHTML = `
     <div id="variant-modal" class="modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:99999;">
-      <div style="background:#1e293b; padding:25px; border-radius:12px; width:90%; max-width:450px; border:1px solid #334155; color:white;">
-        <h3 style="margin-top:0; color:#38bdf8;">Personalizza: ${escapeHtml(nome)}</h3>
-        <p style="font-size:0.85rem; color:#94a3b8;">Scegli cosa rimuovere o aggiungere al tuo piatto.</p>
+      <div style="background:#1e293b; padding:25px; border-radius:12px; width:90%; max-width:450px; border:1px solid #334155; color:white; max-height:85vh; overflow-y:auto;">
+        <h3 style="margin-top:0; color:#38bdf8;">Configura: ${escapeHtml(item.nome)}</h3>
         
-        ${ingredientiBase.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#ef4444;">❌ Rimuovi ingredienti:</h4>' : ''}
-        <div style="margin-bottom:15px;">
-            ${ingredientiBase.map((ing) => `
-                <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
-                    <input type="checkbox" class="chk-rimozione" value="${escapeHtml(ing)}" style="margin-right:8px;"> NO ${escapeHtml(ing)}
-                </label>
-            `).join('')}
-        </div>
+        ${opzioniSingole.length > 0 ? `
+            <h4 style="margin:15px 0 5px 0; font-size:0.9rem; color:#f59e0b;">🥖 Opzione obbligatoria (Seleziona una):</h4>
+            <div style="margin-bottom:15px; background:#0f172a; padding:10px; border-radius:6px; border:1px solid #334155;">
+                ${opzioniSingole.map((p, index) => `
+                    <label style="display:flex; align-items:center; margin-bottom:8px; font-size:0.9rem; cursor:pointer;">
+                        <input type="radio" name="radio-scelta-singola" class="rad-pane" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo_extra}" style="margin-right:8px;" ${index === 0 ? "checked" : ""}>
+                        ${escapeHtml(p.nome)} ${Number(p.prezzo_extra) > 0 ? `(+ € ${Number(p.prezzo_extra).toFixed(2)})` : '(Incluso)'}
+                    </label>
+                `).join('')}
+            </div>
+        ` : ''}
 
-        ${ingredientiExtraDalDB.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#10b981;">➕ Aggiungi Extra del locale:</h4>' : ''}
-        <div style="margin-bottom:20px;">
-            ${ingredientiExtraDalDB.map((extra) => `
-                <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
-                    <!-- Mappatura precisa sul campo prezzo_extra -->
-                    <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo_extra}" style="margin-right:8px;">
-                    + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo_extra).toFixed(2)})
-                </label>
-            `).join('')}
-        </div>
+        ${ingredientiBase.length > 0 ? `
+            <h4 style="margin:15px 0 5px 0; font-size:0.9rem; color:#ef4444;">❌ Togli ingredienti ricetta base:</h4>
+            <div style="margin-bottom:15px;">
+                ${ingredientiBase.map((ing) => `
+                    <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
+                        <input type="checkbox" class="chk-rimozione" value="${escapeHtml(ing)}" ${item.modificheStr && item.modificheStr.includes("NO " + ing) ? "checked" : ""}> NO ${escapeHtml(ing)}
+                    </label>
+                `).join('')}
+            </div>
+        ` : ''}
 
-        <div style="text-align:right;">
-            <button id="btn-annulla-variante" style="background:#475569; border:none; padding:8px 16px; border-radius:6px; color:white; margin-right:10px;">Annulla</button>
-            <button id="btn-conferma-variante" style="background:#10b981; border:none; padding:8px 16px; border-radius:6px; color:#0f172a; font-weight:bold;">Aggiungi 🛒</button>
+        ${opzioniMultipleGratis.length > 0 ? `
+            <h4 style="margin:15px 0 5px 0; font-size:0.9rem; color:#38bdf8;">🥤 Opzioni incluse (Gratis - Max 3):</h4>
+            <div style="margin-bottom:15px; display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                ${opzioniMultipleGratis.map((cond) => `
+                    <label style="display:flex; align-items:center; font-size:0.85rem; cursor:pointer;">
+                        <input type="checkbox" class="chk-gratis-salsa" data-nome="${escapeHtml(cond.nome)}" ${item.modificheStr && item.modificheStr.includes("+" + cond.nome) ? "checked" : ""}> + ${escapeHtml(cond.nome)}
+                    </label>
+                `).join('')}
+            </div>
+        ` : ''}
+
+        ${opzioniMultipleExtra.length > 0 ? `
+            <h4 style="margin:15px 0 5px 0; font-size:0.9rem; color:#10b981;">➕ Aggiungi condimenti / Varianti extra:</h4>
+            <div style="margin-bottom:15px;">
+                ${opzioniMultipleExtra.map((extra) => `
+                    <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
+                        <input type="checkbox" class="chk-pagamento-extra" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo_extra}" ${item.modificheStr && item.modificheStr.includes("+" + extra.nome) ? "checked" : ""}>
+                        + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo_extra).toFixed(2)})
+                    </label>
+                `).join('')}
+            </div>
+        ` : ''}
+
+        <div style="text-align:right; margin-top:20px; border-top:1px solid #334155; padding-top:15px;">
+            <button id="btn-annulla-variante" style="background:#475569; border:none; padding:8px 16px; border-radius:6px; color:white; margin-right:10px;">Chiudi</button>
+            <button id="btn-conferma-variante" style="background:#10b981; border:none; padding:8px 16px; border-radius:6px; color:#0f172a; font-weight:bold;">Salva ricetta ✨</button>
         </div>
       </div>
     </div>`;
@@ -131,103 +174,51 @@ window.apriModaleVarianti = async function(prodottoId, nome, prezzoBase, descriz
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     const vModal = document.getElementById("variant-modal");
 
+    const chkSalse = vModal.querySelectorAll(".chk-gratis-salsa");
+    chkSalse.forEach(chk => {
+        chk.addEventListener("change", () => {
+            if (vModal.querySelectorAll(".chk-gratis-salsa:checked").length > 3) {
+                chk.checked = false;
+                alert("Puoi scegliere un massimo di 3 opzioni gratuite!");
+            }
+        });
+    });
+
     vModal.querySelector("#btn-annulla-variante").onclick = () => vModal.remove();
 
     vModal.querySelector("#btn-conferma-variante").onclick = () => {
         let variazioniList = [];
-        let prezzoFinaleProdotto = parseFloat(prezzoBase);
+        let nuovoPrezzoCalcolato = parseFloat(item.prezzoOrig);
+
+        const radPaneScelto = vModal.querySelector(".rad-pane:checked");
+        if (radPaneScelto) {
+            const nomePane = radPaneScelto.getAttribute("data-nome");
+            const prezzoPane = parseFloat(radPaneScelto.getAttribute("data-prezzo"));
+            variazioniList.push("Scelta: " + nomePane);
+            nuovoPrezzoCalcolato += prezzoPane;
+        }
 
         vModal.querySelectorAll(".chk-rimozione:checked").forEach(chk => {
             variazioniList.push("NO " + chk.value);
         });
 
-        vModal.querySelectorAll(".chk-aggiunta:checked").forEach(chk => {
-            const nomeExtra = chk.getAttribute("data-nome");
-            const prezzoExtra = parseFloat(chk.getAttribute("data-prezzo"));
-            variazioniList.push("+" + nomeExtra);
-            prezzoFinaleProdotto += prezzoExtra;
+        vModal.querySelectorAll(".chk-gratis-salsa:checked").forEach(chk => {
+            variazioniList.push("+" + chk.getAttribute("data-nome"));
         });
 
-        const modificheStringaFinale = variazioniList.join(", ");
-
-        let cart = getCartItems(ristorante.id);
-        cart.push({
-            carrelloId: crypto.randomUUID(),
-            id: prodottoId,
-            nome: nome,
-            prezzo: prezzoFinaleProdotto,
-            quantita: 1,
-            modificheStr: modificheStringaFinale || null
+        vModal.querySelectorAll(".chk-pagamento-extra:checked").forEach(chk => {
+            variazioniList.push("+" + chk.getAttribute("data-nome"));
+            nuovoPrezzoCalcolato += parseFloat(chk.getAttribute("data-prezzo"));
         });
 
-        saveCart(cart, ristorante.id);
-        renderCart(ristorante.id);
+        item.modificheStr = variazioniList.join(", ") || null;
+        item.prezzo = nuovoPrezzoCalcolato;
+
+        saveCart(cart, ristoranteId);
+        renderCart(ristoranteId);
         vModal.remove();
-        showToast("Prodotto aggiunto!");
-    
+        showToast("Configurazione salvata!");
     };
-};
-
-function showOrderModal(ristorante) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tavoloDalQR = urlParams.get('tavolo');
-
-    const salvatoNome = localStorage.getItem("zf_user_nome") || "";
-    const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
-
-    const modalHTML = `
-    <div id="order-modal" class="modal">
-      <div class="modal-content">
-        <h2>Completa il tuo Ordine</h2>
-        
-        <label>Nome e Cognome <span class="required">*</span></label>
-        <input type="text" id="cliente-nome" value="${escapeHtml(salvatoNome)}" placeholder="Mario Rossi" required>
-
-        <label>Tipo di Ordine</label>
-        <select id="tipo-ordine" ${tavoloDalQR ? 'disabled' : ''}>
-          <option value="tavolo" ${tavoloDalQR ? 'selected' : ''}>🪑 Al Tavolo</option>
-          <option value="asporto" ${!tavoloDalQR ? 'selected' : ''}>📦 Asporto</option>
-          <option value="delivery">🚀 Delivery</option>
-        </select>
-
-        <div id="tavolo-fields">
-          <label>N° Tavolo <span class="required">*</span></label>
-          <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
-        </div>
-
-        <div id="delivery-fields" style="display:none;">
-          <label>Indirizzo di consegna <span class="required">*</span></label>
-          <input type="text" id="indirizzo" placeholder="Via Roma 123">
-        </div>
-
-        <label>Telefono <span class="required">*</span></label>
-        <input type="tel" id="telefono" value="${escapeHtml(salvatoTelefono)}" placeholder="333 1234567" required>
-
-        <label>Note / Allergie</label>
-        <textarea id="note" rows="3" placeholder="Allergie, preferenze..."></textarea>
-
-        <div class="modal-buttons">
-          <button id="modal-cancel">Annulla</button>
-          <button id="modal-confirm">✅ Invia Ordine</button>
-        </div>
-      </div>
-    </div>`;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = document.getElementById("order-modal");
-    const tipoSelect = modal.querySelector("#tipo-ordine");
-    
-    const aggiornaCampiVisibili = () => {
-        const val = tipoSelect.value;
-        document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
-        document.getElementById("delivery-fields").style.display = val === "delivery" ? "block" : "none";
-    };
-
-    aggiornaCampiVisibili();
-    tipoSelect.addEventListener("change", aggiornaCampiVisibili);
-
-    modal.querySelector("#modal-cancel").onclick = () => modal.remove();
-    modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
 }
 
 async function elaboraInvioComanda(modal, ristorante) {
@@ -344,5 +335,11 @@ document.addEventListener("click", (e) => {
             saveCart(cart, rid);
             renderCart(rid);
         }
+    }
+
+    if (e.target.classList.contains("btn-apri-varianti")) {
+        const cid = e.target.getAttribute("data-cid");
+        const rid = e.target.getAttribute("data-rid");
+        apriModaleVarianti(cid, rid);
     }
 });
