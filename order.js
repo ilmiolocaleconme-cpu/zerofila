@@ -221,6 +221,7 @@ export async function apriModaleVarianti(carrelloId, ristoranteId) {
     };
 }
 
+// (Tutto il resto della logica di elaboraInvioComanda rimane agganciato sotto...)
 async function elaboraInvioComanda(modal, ristorante) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
