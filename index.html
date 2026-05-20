@@ -30,7 +30,13 @@
     </aside>
   </div>
 
-  <script type="module" src="main.js"></script>
+  <!-- Forza il browser a scaricare la versione corretta di menu.js cancellando la vecchia cache -->
+  <script type="module">
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = `menu.js?v=999`;
+    document.body.appendChild(script);
+  </script>
 
 </body>
 </html>
