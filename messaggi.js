@@ -39,3 +39,32 @@ export function componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo
 
     return testo;
 }
+/**
+ * Genera il testo delle notifiche di stato automatiche e gratuite per i clienti
+ */
+export function componiNotificaStatoWhatsApp(nomeCliente, tipoOrdine, nuovoStato, tavolo, indirizzo, nomeRistorante) {
+    let messaggio = "Ciao *" + nomeCliente + "*, aggiornamento da *" + nomeRistorante.toUpperCase() + "*! 🍔\n\n";
+
+    if (nuovoStato === "preparazione") {
+        if (tipoOrdine === "tavolo") {
+            messaggio += "👨‍🍳 Il cuoco ha preso in carico la tua comanda! I tuoi piatti sono in preparazione e ti verranno serviti a breve al *Tavolo " + (tavolo || '') + "*.";
+        } else if (tipoOrdine === "asporto") {
+            messaggio += "📦 Stiamo preparando il tuo ordine da asporto! A breve sarà pronto per il ritiro in cassa.";
+        } else if (tipoOrdine === "delivery") {
+            messaggio += "🚀 I tuoi piatti sono in preparazione! Il nostro rider si sta già preparando per la consegna.";
+        }
+    } 
+    else if (nuovoStato === "pronto") {
+        if (tipoOrdine === "tavolo") {
+            messaggio += "🟢 I tuoi piatti sono pronti! Il cameriere li sta portando al tuo tavolo. Buon appetito!";
+        } else if (tipoOrdine === "asporto") {
+            messaggio += "🟢 *ORDINE PRONTO!* Puoi avvicinarti alla cassa per ritirare i tuoi piatti caldi.";
+        } else if (tipoOrdine === "delivery") {
+            messaggio += "🛵 *SIAMO IN CONSEGNA!* Il tuo ordine è pronto ed è appena partito con il nostro rider verso: _" + (indirizzo || '') + "_. Arriverà a breve!";
+        }
+    }
+
+    messaggio += "\n\nInviato tramite *ZeroFila* ✨";
+    return messaggio;
+}
+
