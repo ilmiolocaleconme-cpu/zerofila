@@ -1,12 +1,20 @@
-import { initMenu } from './menu.js';
-
 document.addEventListener("DOMContentLoaded", async () => {
-    // Se siamo nella pagina della cucina, inizializza la dashboard del cuoco
+    // Rileva in automatico se ti trovi nella schermata della cucina o nel menu clienti
     if (window.location.pathname.includes("kitchen.html")) {
-        const kitchenMod = await import('./kitchen.js');
-        kitchenMod.initKitchen();
+        
+        // Carica la cucina coordinata sulla versione stabile
+        const kitchenMod = await import('./kitchen.js?v=7.0.0');
+        if (kitchenMod && typeof kitchenMod.initKitchen === "function") {
+            kitchenMod.initKitchen();
+        }
+        
     } else {
-        // Altrimenti inizializza il menu clienti standard
-        initMenu();
+        
+        // Carica il menu clienti coordinato sulla stessa identica istanza di memoria
+        const menuMod = await import('./menu.js?v=7.0.0');
+        if (menuMod && typeof menuMod.initMenu === "function") {
+            menuMod.initMenu();
+        }
+        
     }
 });
