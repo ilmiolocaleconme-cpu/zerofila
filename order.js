@@ -5,15 +5,6 @@ import { componiMessaggioWhatsApp } from './messaggi.js';
 const cartContainer = document.getElementById("cart-items");
 const cartTotalElement = document.getElementById("cart-total");
 
-// Elenco fisso globale di ingredienti Extra a pagamento (Universale SaaS)
-const INGREDIENTI_EXTRA = [
-    { nome: "Bacon", prezzo: 1.00 },
-    { nome: "Cheddar", prezzo: 0.80 },
-    { nome: "Doppio Hamburger", prezzo: 2.50 },
-    { nome: "Burrata", prezzo: 1.50 },
-    { nome: "Pesto Pistacchio", prezzo: 1.00 }
-];
-
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -54,9 +45,9 @@ export function renderCart(ristoranteId) {
                 ${infoModifiche}
             </div>
             <div class="item-controlli">
-                <button class="btn-cart-meno" data-cid="${item.carrelloId}">-</button>
+                <button class="btn-cart-meno" data-cid="${item.carrelloId}" data-rid="${ristoranteId}">-</button>
                 <span class="item-quantita">${item.quantita}</span>
-                <button class="btn-cart-piu" data-cid="${item.carrelloId}">+</button>
+                <button class="btn-cart-piu" data-cid="${item.carrelloId}" data-rid="${ristoranteId}">+</button>
             </div>
             <span class="item-prezzo">€ ${formatPrice(item.prezzo * item.quantita)}</span>
         `;
@@ -82,13 +73,28 @@ export function initOrderLogic(ristorante) {
     }
 }
 
-// RIPARATA: prezzoBase unito correttamente senza spazi distruttivi
-window.apriModaleVarianti = function(prodottoId, nome, prezzoBase, descrizioneCibo) {
-    const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
-    const ristoranteData = sessionStorage.getItem("zf_current_ristorante");
-    const ristorante = ristoranteData ? JSON.parse(ristoranteData) : null;
-
+// STRUTTURA AVANZATA: Estrae gli ingredienti extra in tempo reale da Supabase in base al ristorante
+window.apriModaleVarianti = async function(prodottoId, nome, prezzoBase, descrizioneCibo, ristorante) {
     if (!ristorante) return;
+    
+    // Mostra un caricamento leggero mentre scarica gli extra dal DB
+    showToast("Caricamento opzioni...", "info");
+
+    let ingredientiExtraDalDB = [];
+    try {
+        const { data: extras, error } = await supabaseClient
+            .from("ingredienti_extra")
+            .select("*")
+            .eq("ristorante_id", ristorante.id);
+        
+        if (!error && extras) {
+            ingredientiExtraDalDB = extras;
+        }
+    } catch (e) {
+        console.error("Errore recupero extra:", e);
+    }
+
+    const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
 
     const modalHTML = `
     <div id="variant-modal" class="modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; justify-content:center; align-items:center; z-index:99999;">
@@ -105,12 +111,12 @@ window.apriModaleVarianti = function(prodottoId, nome, prezzoBase, descrizioneCi
             `).join('')}
         </div>
 
-        <h4 style="margin-bottom:5px; font-size:0.9rem; color:#10b981;">➕ Aggiungi Extra:</h4>
+        ${ingredientiExtraDalDB.length > 0 ? '<h4 style="margin-bottom:5px; font-size:0.9rem; color:#10b981;">➕ Aggiungi Extra del locale:</h4>' : ''}
         <div style="margin-bottom:20px;">
-            ${INGREDIENTI_EXTRA.map((extra) => `
+            ${ingredientiExtraDalDB.map((extra) => `
                 <label style="display:flex; align-items:center; margin-bottom:6px; font-size:0.9rem; cursor:pointer;">
                     <input type="checkbox" class="chk-aggiunta" data-nome="${escapeHtml(extra.nome)}" data-prezzo="${extra.prezzo}" style="margin-right:8px;">
-                    + ${escapeHtml(extra.nome)} (+ € ${extra.prezzo.toFixed(2)})
+                    + ${escapeHtml(extra.nome)} (+ € ${Number(extra.prezzo).toFixed(2)})
                 </label>
             `).join('')}
         </div>
@@ -311,24 +317,22 @@ async function elaboraInvioComanda(modal, ristorante) {
 }
 
 document.addEventListener("click", (e) => {
-    const dataRest = sessionStorage.getItem("zf_current_ristorante");
-    if (!dataRest) return;
-    const ristorante = JSON.parse(dataRest);
-
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
-        let cart = getCartItems(ristorante.id);
+        const rid = e.target.getAttribute("data-rid");
+        let cart = getCartItems(rid);
         const item = cart.find(i => i.carrelloId === cid);
         if (item) {
             item.quantita += 1;
-            saveCart(cart, ristorante.id);
-            renderCart(ristorante.id);
+            saveCart(cart, rid);
+            renderCart(rid);
         }
     }
 
     if (e.target.classList.contains("btn-cart-meno")) {
         const cid = e.target.getAttribute("data-cid");
-        let cart = getCartItems(ristorante.id);
+        const rid = e.target.getAttribute("data-rid");
+        let cart = getCartItems(rid);
         const itemIndex = cart.findIndex(i => i.carrelloId === cid);
         if (itemIndex !== -1) {
             if (cart[itemIndex].quantita > 1) {
@@ -336,8 +340,8 @@ document.addEventListener("click", (e) => {
             } else {
                 cart.splice(itemIndex, 1);
             }
-            saveCart(cart, ristorante.id);
-            renderCart(ristorante.id);
+            saveCart(cart, rid);
+            renderCart(rid);
         }
     }
 });
