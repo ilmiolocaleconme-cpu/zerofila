@@ -74,7 +74,6 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Aggancio sincronizzato al carrello di order.js
         const orderMod = await import(`./order.js?v=7.0.0`);
         if (orderMod && typeof orderMod.renderCart === "function") {
             orderMod.renderCart(ristorante.id);
@@ -88,8 +87,8 @@ export async function initMenu() {
 }
 
 /**
- * INTERCETTATORE UNIFICATO CON FILTRO SELETTIVO EXTRA
- * Esclude la comparsa degli ingredienti di carne/formaggio all'interno delle bevande
+ * INTERCETTATORE UNIFICATO CON AGGIUNTA DIRETTA INTELLIGENTE
+ * Se il prodotto è una bevanda va dritto nel carrello, altrimenti apre la modale delle varianti
  */
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart") && currentRistoranteObj) {
@@ -98,23 +97,39 @@ document.addEventListener("click", async (e) => {
         const prezzoBase = parseFloat(e.target.getAttribute("data-prezzo"));
         const descrizioneCibo = e.target.getAttribute("data-descrizione") || "";
 
-        // Trova il blocco della sezione corrente per leggere il titolo della categoria a schermo
+        // Rileva la categoria per capire se è una bevanda
         const sezioneCategoria = e.target.closest(".menu-section");
         const nomeCategoria = sezioneCategoria ? (sezioneCategoria.querySelector(".categoria-titolo")?.textContent || "") : "";
 
+        // SE È UNA BEVANDA: Salta la modale e aggiungi direttamente al carrello!
+        if (nomeCategoria.includes("Bevande") || nomeCategoria.includes("🥤")) {
+            const orderMod = await import(`./order.js?v=7.0.0`);
+            let cart = orderMod.getCartItems(currentRistoranteObj.id);
+            
+            cart.push({
+                carrelloId: crypto.randomUUID(),
+                id: id,
+                nome: nome,
+                prezzo: prezzoBase,
+                quantita: 1,
+                modificheStr: null // Nessuna modifica possibile per le bevande
+            });
+            
+            orderMod.saveCart(cart, currentRistoranteObj.id);
+            orderMod.renderCart(currentRistoranteObj.id);
+            return; // Interrompe l'esecuzione così la modale non si apre
+        }
+
+        // SE È UN PANINO/PIZZA: Continua normalmente e apri la modale delle varianti
         let ingredientiExtraDalDB = [];
-        
-        // CONTROLLO COMMERCIALE: Se il titolo contiene "Bevande" o l'emoji 🥤, salta la lettura degli extra!
-        if (!nomeCategoria.includes("Bevande") && !nomeCategoria.includes("🥤")) {
-            try {
-                const { data: extras } = await supabaseClient
-                    .from("ingredienti_extra")
-                    .select("*")
-                    .eq("ristorante_id", currentRistoranteObj.id);
-                if (extras) ingredientiExtraDalDB = extras;
-            } catch (err) {
-                console.error("Errore lettura ingredienti extra:", err);
-            }
+        try {
+            const { data: extras } = await supabaseClient
+                .from("ingredienti_extra")
+                .select("*")
+                .eq("ristorante_id", currentRistoranteObj.id);
+            if (extras) ingredientiExtraDalDB = extras;
+        } catch (err) {
+            console.error("Errore lettura ingredienti extra:", err);
         }
 
         const ingredientiBase = descrizioneCibo ? descrizioneCibo.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
@@ -173,7 +188,6 @@ document.addEventListener("click", async (e) => {
 
             const modificheStringaFinale = variazioniList.join(", ");
 
-            // Trasferimento sicuro al modulo order.js per il rendering nel carrello laterale
             import(`./order.js?v=7.0.0`).then((orderMod) => {
                 let cart = orderMod.getCartItems(currentRistoranteObj.id);
                 cart.push({
