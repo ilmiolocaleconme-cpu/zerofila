@@ -59,7 +59,6 @@ export async function initMenu() {
                         <p>${escapeHtml(p.descrizione || '')}</p>
                         <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                     </div>
-                    <!-- Iniettiamo la descrizione direttamente come attributo sicuro -->
                     <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}">➕ Aggiungi</button>
                 `;
                 grid.appendChild(card);
@@ -69,7 +68,8 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        const orderMod = await import(`./order.js`);
+        // Caricamento dinamico del carrello con versione controllata anti-crash
+        const orderMod = await import(`./order.js?v=4.0.0`);
         orderMod.renderCart(ristorante.id);
         orderMod.initOrderLogic(ristorante);
 
@@ -79,7 +79,6 @@ export async function initMenu() {
     }
 }
 
-// Intercettatore blindato: prende i dati direttamente dal pulsante senza cercare la card
 document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("btn-add-to-cart")) {
         const id = e.target.getAttribute("data-id");
@@ -87,7 +86,9 @@ document.addEventListener("click", async (e) => {
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         const descrizione = e.target.getAttribute("data-descrizione") || "";
 
-        const orderMod = await import(`./order.js`);
+        const orderMod = await import(`./order.js?v=4.0.0`);
         orderMod.apriModaleVarianti(id, nome, prezzo, descrizione);
     }
 });
+
+initMenu();
