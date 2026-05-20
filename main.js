@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             kitchenMod.initKitchen();
         }
     } else {
-        const menuMod = await import('./menu.js?v=9.5.0');
+        const menuMod = await import('./menu.js?v=9.6.0');
         if (menuMod && typeof menuMod.initMenu === "function") {
             menuMod.initMenu();
         }
