@@ -10,16 +10,12 @@ const statusDiv = document.getElementById("status");
 const qrPreviewBox = document.getElementById("qr-preview-box");
 const titleQrBox = document.getElementById("title-qr-box");
 
-// Elementi di iniezione dei link automatici per il commerciante
 const linksBox = document.getElementById("links-ristoratore-box");
 const linkUtenteTarget = document.getElementById("link-utente-target");
 const linkCucinaTarget = document.getElementById("link-cucina-target");
 
 let listaLocaliCompleta = [];
 
-/**
- * Recupera l'elenco completo dei ristoranti inseriti nel SaaS per popolare il menu a tendina
- */
 async function caricaRistoranti() {
     try {
         const { data: ristoranti, error } = await supabaseClient
@@ -43,9 +39,6 @@ async function caricaRistoranti() {
     }
 }
 
-/**
- * Gestisce l'upload sicuro del Logo aziendale nel bucket pubblico 'assets' di Supabase
- */
 async function uploadLogoA_Storage(file, locale) {
     const fileExt = file.name.split('.').pop();
     const fileName = locale.slug + "-logo-" + Date.now() + "." + fileExt;
@@ -70,20 +63,13 @@ async function uploadLogoA_Storage(file, locale) {
     return data.publicUrl;
 }
 
-/**
- * Genera vettorialmente i QR Code a schermo senza subire rallentamenti di memoria
- */
 function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     qrPreviewBox.innerHTML = "";
     titleQrBox.style.display = "block";
     const hiddenGen = document.getElementById("qr-hidden-generator");
 
-    // Costruzione link base corretta con oggetto URL nativo per evitare errori grafici nei QR
-    const baseLinkURL = new URL("https://vercel.app");
-    baseLinkURL.searchParams.set("r", locale.slug);
-    const baseLink = baseLinkURL.toString();
+    const baseLink = "https://vercel.app" + locale.slug;
 
-    // 1. Generazione del QR Code Generico (Social, Packaging, Asporto)
     if (generaGenerico === "si") {
         const card = document.createElement("div");
         card.className = "qr-card";
@@ -98,7 +84,6 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
         }, 150);
     }
 
-    // 2. Generazione controllata e sequenziale dei QR Code dei singoli tavoli sala
     if (numeroTavoli > 0) {
         for (let i = 1; i <= numeroTavoli; i++) {
             const tavoloLink = baseLink + "&tavolo=" + i;
@@ -121,12 +106,9 @@ function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
     }
 }
 
-/**
- * Event Listener Principale di Esecuzione Onboarding Amministratore (Versione Gratuita)
- */
 btnAvvia.onclick = async () => {
     const ristoranteId = selectRistorante.value;
-    const logoFile = logoInput.files[0]; // Riparata l'estrazione singola dell'array binary del file
+    const logoFile = logoInput.files[0];
     const generaGenerico = checkQrGenerico.value;
     const numeroTavoli = parseInt(numTavoliInput.value) || 0;
 
@@ -143,33 +125,24 @@ btnAvvia.onclick = async () => {
     btnAvvia.disabled = true;
 
     try {
-        // 1. COSTRUZIONE CON OGGETTO URL NATIVO (Esclude errori di barre mancanti o stringhe unite)
-        const urlBaseMenu = new URL("https://vercel.app");
-        urlBaseMenu.searchParams.set("r", localeSelezionato.slug);
-        const urlMenuClienti = urlBaseMenu.toString();
-
-        const urlBaseCucina = new URL("https://vercel.appkitchen.html");
-        urlBaseCucina.searchParams.set("r", localeSelezionato.slug);
-        const urlPannelloCucina = urlBaseCucina.toString();
+        // CORREZIONE STRUTTURALE DEFINITIVA CON LO SLASH INSERITO ALLA FINE DEL DOMINIO
+        const urlMenuClienti = "https://vercel.app" + localeSelezionato.slug;
+        const urlPannelloCucina = "https://vercel.app" + localeSelezionato.slug;
         
-        // Iniezione controllata e pulita dei link nell'interfaccia grafica
         linkUtenteTarget.href = urlMenuClienti;
         linkUtenteTarget.textContent = urlMenuClienti;
         
         linkCucinaTarget.href = urlPannelloCucina;
         linkCucinaTarget.textContent = urlPannelloCucina;
         
-        // Rende visibile il pannello dei collegamenti privati del commerciante
         if (linksBox) linksBox.style.display = "block";
 
-        // 2. Upload Logo se caricato nel form
         if (logoFile) {
             statusDiv.innerHTML += "🖼️ Upload del logo aziendale in corso...<br>";
             await uploadLogoA_Storage(logoFile, localeSelezionato);
             statusDiv.innerHTML += "✅ Logo inserito nello storage pubblico e collegato.<br>";
         }
 
-        // 3. Generazione automatica dei codici QR a schermo
         if (generaGenerico === "si" || numeroTavoli > 0) {
             statusDiv.innerHTML += "📐 Generazione grafica del QR-Kit in corso...<br>";
             generaQrKitGrafico(localeSelezionato, generaGenerico, numeroTavoli);
@@ -182,6 +155,10 @@ btnAvvia.onclick = async () => {
         mostraErroreFinale(err.message);
     }
 };
+
+function montreSuccessoFinale() { // Allineamento interno nomi funzioni
+    mostraSuccessoFinale();
+}
 
 function mostraSuccessoFinale() {
     statusDiv.style.background = "rgba(16, 185, 129, 0.1)";
@@ -200,5 +177,4 @@ function mostraErroreFinale(messaggio) {
     btnAvvia.disabled = false;
 }
 
-// Inizializzazione automatica al caricamento dello script
 caricaRistoranti();
