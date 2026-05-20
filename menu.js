@@ -68,10 +68,12 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        // Caricamento dinamico del carrello con versione controllata anti-crash
-        const orderMod = await import(`./order.js?v=4.0.0`);
-        orderMod.renderCart(ristorante.id);
-        orderMod.initOrderLogic(ristorante);
+        // CARICAMENTO SICURO DEL CARRELLO
+        const orderMod = await import(`./order.js?v=5.0.0`);
+        if (orderMod && typeof orderMod.renderCart === "function") {
+            orderMod.renderCart(ristorante.id);
+            orderMod.initOrderLogic(ristorante);
+        }
 
     } catch (err) {
         console.error(err);
@@ -86,8 +88,10 @@ document.addEventListener("click", async (e) => {
         const prezzo = parseFloat(e.target.getAttribute("data-prezzo"));
         const descrizione = e.target.getAttribute("data-descrizione") || "";
 
-        const orderMod = await import(`./order.js?v=4.0.0`);
-        orderMod.apriModaleVarianti(id, nome, prezzo, descrizione);
+        const orderMod = await import(`./order.js?v=5.0.0`);
+        if (orderMod && typeof orderMod.apriModaleVarianti === "function") {
+            orderMod.apriModaleVarianti(id, nome, prezzo, descrizione);
+        }
     }
 });
 
