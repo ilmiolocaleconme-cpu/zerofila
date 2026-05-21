@@ -31,6 +31,15 @@ export function renderCart(ristoranteId) {
     if (cart.length === 0) {
         cartContainer.innerHTML = "<p class='cart-empty'>Il carrello è vuoto</p>";
         if (cartTotalElement) cartTotalElement.textContent = "€ 0.00";
+        // Ripristina il pulsante originale se il carrello viene svuotato
+        const btnProcedi = document.getElementById("send-order");
+        if (btnProcedi) {
+            btnProcedi.replaceWith(btnProcedi.cloneNode(true));
+            const newBtn = document.getElementById("send-order");
+            newBtn.style.cssText = "";
+            newBtn.innerHTML = "🛒 Procedi all'Ordine";
+            initOrderButtonLogic();
+        }
         return;
     }
 
@@ -345,7 +354,7 @@ function showOrderModal() {
         <textarea id="note" rows="3" placeholder="Allergie, preferenze..."></textarea>
         <div class="modal-buttons">
           <button id="modal-cancel">Annulla</button>
-          <button id="modal-confirm">✅ 1. Registra Comanda</button>
+          <button id="modal-confirm">✅ Salva in Cucina</button>
         </div>
       </div>
     </div>`;
@@ -370,7 +379,7 @@ function showOrderModal() {
 async function elaboraInvioComanda(modal) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
-    confirmBtn.textContent = "⏳ Registrazione ordine...";
+    confirmBtn.textContent = "⏳ Registrazione...";
 
     try {
         const cart = getCartItems(currentRistoranteObj.id);
@@ -384,7 +393,7 @@ async function elaboraInvioComanda(modal) {
         const indirizzo = tipo === "delivery" ? modal.querySelector("#indirizzo")?.value.trim() : null;
 
         if (!nome || !telefono) throw new Error("Nome e telefono sono obbligatori");
-        if (tipo === "tavolo" && !tavolo) throw new Error("Inserisci il numero del tavolo");
+        if (tipo === "tavolo" && !tavolo) throw new Error("Insegna il numero del tavolo");
         if (tipo === "delivery" && !indirizzo) throw new Error("Inserisci l'indirizzo");
 
         localStorage.setItem("zf_user_nome", nome);
@@ -392,7 +401,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // STEP 1: Scrittura comanda su Supabase
+        // 1. Inserimento comanda nel DB pubblico
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -411,6 +420,7 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
+        // 2. Inserimento righe prodotti ordinati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -421,9 +431,8 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // STEP 2: Composizione del testo dell'ordine
+        // 3. Costruzione della stringa del messaggio
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
-        
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
         msg += `--------------------------------\n\n`;
         msg += `👤 *Cliente:* ${nome}\n`;
@@ -432,7 +441,7 @@ async function elaboraInvioComanda(modal) {
         if (tavolo) msg += `🪑 *Tavolo:* ${tavolo}\n`;
         if (indirizzo) msg += `📍 *Indirizzo:* ${indirizzo}\n`;
         if (note) msg += `📝 *Note:* ${note}\n`;
-        msg += `\n📋 *PRODOTTI ORDINATI:*\n`;
+        msg += `\n📋 *PRODOTTI:*\n`;
         
         cart.forEach(item => {
             msg += `• ${item.quantita}x _${item.nome}_ - € ${formatPrice(item.prezzo * item.quantita)}\n`;
@@ -440,50 +449,41 @@ async function elaboraInvioComanda(modal) {
         });
         
         msg += `\n--------------------------------\n`;
-        msg += `💰 *TOTALE DA PAGARE:* € ${formatPrice(subtotale)}\n\n`;
-        msg += `✨ Ordinato con *ZeroFila*`;
+        msg += `💰 *TOTALE:* € ${formatPrice(subtotale)}\n\n`;
+        msg += `✨ Inviato con *ZeroFila*`;
 
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        // Pulisce la memoria locale del carrello
+        // Svuota la memoria carrello locale
         saveCart([], currentRistoranteObj.id);
+        renderCart(currentRistoranteObj.id);
         modal.remove();
 
-        // 🚀 STEP 3: COSTRUZIONE DELL'INTERFACCIA FISSA WHATSAPP (A prova di blocco pop-up)
-        const linkPrivatoSaaS = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
-        
-        // Trasforma interamente l'area carrello in un pulsante nativo gigante a tutto schermo
-        if (cartContainer) {
-            cartContainer.innerHTML = `
-                <div style="padding:40px 20px; text-align:center; background:#0f172a; border-radius:12px; border:2px dashed #25D366; margin:20px 0;">
-                    <h3 style="color:#10b981; margin-top:0;">✅ ORDINE REGISTRATO IN CUCINA!</h3>
-                    <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:25px;">La comanda è già sul monitor dello chef. Clicca adesso sul pulsante verde qui sotto per aprire la chat ed inviare la copia dell'ordine sul telefono del locale.</p>
-                    <a href="${linkPrivatoSaaS}" target="_top" style="display:block; text-align:center; padding:18px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:10px; text-decoration:none; box-shadow: 0 10px 20px rgba(37,211,102,0.4); animation: pulse 2s infinite;">💬 INVIA SU WHATSAPP ORA</a>
-                </div>
-            `;
+        // 🚀 TRASFORMAZIONE STRATEGICA DEL PULSANTE CARRELLO PRINCIPALE IN LINK HTML STATICO
+        const btnProcediLaterale = document.getElementById("send-order");
+        if (btnProcediLaterale) {
+            const linkWhatsAppNativo = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+            
+            // Sostituiamo il bottone con un vero tag di ancoraggio HTML <a>
+            const ancoraWhatsAppFisica = document.createElement("a");
+            ancoraWhatsAppFisica.id = "send-order";
+            ancoraWhatsAppFisica.href = linkWhatsAppNativo;
+            ancoraWhatsAppFisica.target = "_top"; // Forza l'apertura immediata dell'app nativa
+            ancoraWhatsAppFisica.style.cssText = "display:block; text-align:center; width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; text-decoration:none; box-shadow: 0 4px 12px rgba(37,211,102,0.4); margin-top:10px;";
+            ancoraWhatsAppFisica.innerHTML = "💬 CONFERMA SU WHATSAPP";
+            
+            btnProcediLaterale.replaceWith(ancoraWhatsAppFisica);
         }
-        
-        // Nasconde o aggiorna i vecchi tasti inferiori per evitare doppi click
-        const footerTasto = document.getElementById("send-order");
-        if (footerTasto) {
-            footerTasto.replaceWith(footerTasto.cloneNode(true));
-            const nuovoTastoFinto = document.getElementById("send-order");
-            nuovoTastoFinto.style.background = "#334155";
-            nuovoTastoFinto.style.color = "#94a3b8";
-            nuovoTastoFinto.disabled = true;
-            nuovoTastoFinto.textContent = "✅ Ordine Confermato";
-        }
-        if (cartTotalElement) cartTotalElement.textContent = "€ 0.00";
 
-        showToast("✅ Ordine salvato! Tocca il pulsante verde nel carrello per aprire WhatsApp.", "success");
+        showToast("✅ Comanda salvata in cucina! Tocca il pulsante verde apparso sul carrello per aprirlo su WhatsApp.", "success");
 
     } catch (err) {
         console.error(err);
         showToast("❌ Errore procedura: " + err.message, "error");
         if (confirmBtn) {
             confirmBtn.disabled = false;
-            confirmBtn.textContent = "✅ 1. Registra Comanda";
+            confirmBtn.textContent = "✅ Salva in Cucina";
         }
     }
 }
