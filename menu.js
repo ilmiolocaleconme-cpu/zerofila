@@ -393,7 +393,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio su database
+        // 1. Salvataggio su database Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -412,7 +412,7 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
-        // 2. Inserimento righe prodotti
+        // 2. Inserimento prodotti ordinati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -423,8 +423,9 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 3. Formattazione pulita del messaggio
+        // 3. PROTEZIONE DI SICUREZZA INSEGNA: Accetta sia 'nome' che 'name' dal database senza crash
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
+        
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
         msg += `--------------------------------\n\n`;
         msg += `👤 *Cliente:* ${nome}\n`;
@@ -447,26 +448,28 @@ async function elaboraInvioComanda(modal) {
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        // Pulisce il carrello a schermo
+        // Svuota la memoria del carrello locale
         saveCart([], currentRistoranteObj.id);
         renderCart(currentRistoranteObj.id);
 
-        // 🚀 ATTIVAZIONE BLINDATURA: Trasforma il pulsante in un link diretto a WhatsApp
+        // 🚀 STRUTTURA AD AZIONE DIRETTA INSERITA: Attiva il secondo click manuale indistruttibile
         if (cancelBtn) cancelBtn.style.display = "none";
         
         confirmBtn.disabled = false;
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
-        confirmBtn.innerHTML = "💬 Invia su WhatsApp Ora";
+        confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
 
-        // Il click successivo è 100% manuale e bypassa i blocchi mobile ad occhi chiusi
+        // Click fisico forzato: bypassa i filtri di pop-up di Android, iOS, Chrome e Safari
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
-            confirmBtn.textContent = "Apertura chat...";
+            confirmBtn.textContent = "Apertura WhatsApp...";
             modal.remove();
-            window.location.href = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+            
+            const linkFinaleWH = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+            window.open(linkFinaleWH, "_top"); // Spinge l'app ad aprirsi sopra il browser in un millisecondo
         };
 
-        showToast("✅ Registrato! Tocca il tasto verde per avviare WhatsApp.", "success");
+        showToast("✅ Salvato nel database! Clicca il pulsante verde per confermare l'invio.", "success");
 
     } catch (err) {
         console.error(err);
@@ -478,7 +481,7 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
-// --- COORDIDAMENTO DEI CLICK SULLO SCHERMO ---
+// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
