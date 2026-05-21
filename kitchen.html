@@ -5,15 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZeroFila - Dashboard Cucina</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://jsdelivr.net"></script>
 </head>
 <body>
-  <header class="header"><h1 id="kitchen-title">🍔 Dashboard Cucina</h1></header>
+
+  <header class="header">
+    <h1 id="kitchen-title">🍔 Dashboard Cucina</h1>
+  </header>
+
   <div class="controls-bar">
     <button id="enable-audio">🔊 ATTIVA AUDIO</button>
     <audio id="new-order-sound" preload="auto"></audio>
   </div>
-  <main id="kitchen-orders"><p class="loading-state">Connessione al sistema...</p></main>
-  <script type="module" src="kitchen.js"></script>
+
+  <!-- Tabellone dinamico delle comande -->
+  <main id="kitchen-orders">
+    <p class="loading-state">Connessione al sistema...</p>
+  </main>
+
+  <!-- ALLINEAMENTO CORE: Punta a main.js per gestire la cache v=61.0.0 senza subire blocchi -->
+  <script type="module" src="main.js"></script>
+
 </body>
 </html>
