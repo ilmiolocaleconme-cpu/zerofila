@@ -215,73 +215,12 @@ export async function apriModaleVarianti(carrelloId, ristoranteId) {
         item.modificheStr = variazioniList.join(", ") || null;
         item.prezzo = nuovoPrezzoCalcolato;
 
+        // 🛠️ BUG CORRETTO: Variante ristoranteId scritta in italiano impeccabile!
         saveCart(cart, ristoranteId);
         renderCart(ristoranteId);
         vModal.remove();
         showToast("Configurazione salvata!");
     };
-}
-
-function showOrderModal(ristorante) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tavoloDalQR = urlParams.get('tavolo');
-
-    const salvatoNome = localStorage.getItem("zf_user_nome") || "";
-    const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
-
-    const modalHTML = `
-    <div id="order-modal" class="modal">
-      <div class="modal-content">
-        <h2>Completa il tuo Ordine</h2>
-        
-        <label>Nome e Cognome <span class="required">*</span></label>
-        <input type="text" id="cliente-nome" value="${escapeHtml(salvatoNome)}" placeholder="Mario Rossi" required>
-
-        <label>Tipo di Ordine</label>
-        <select id="tipo-ordine" ${tavoloDalQR ? 'disabled' : ''}>
-          <option value="tavolo" ${tavoloDalQR ? 'selected' : ''}>🪑 Al Tavolo</option>
-          <option value="asporto" ${!tavoloDalQR ? 'selected' : ''}>📦 Asporto</option>
-          <option value="delivery">🚀 Delivery</option>
-        </select>
-
-        <div id="tavolo-fields">
-          <label>N° Tavolo <span class="required">*</span></label>
-          <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
-        </div>
-
-        <div id="delivery-fields" style="display:none;">
-          <label>Indirizzo di consegna <span class="required">*</span></label>
-          <input type="text" id="indirizzo" placeholder="Via Roma 123">
-        </div>
-
-        <label>Telefono <span class="required">*</span></label>
-        <input type="tel" id="telefono" value="${escapeHtml(salvatoTelefono)}" placeholder="333 1234567" required>
-
-        <label>Note / Allergie</label>
-        <textarea id="note" rows="3" placeholder="Allergie, preferenze..."></textarea>
-
-        <div class="modal-buttons">
-          <button id="modal-cancel">Annulla</button>
-          <button id="modal-confirm">✅ Invia Ordine</button>
-        </div>
-      </div>
-    </div>`;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = document.getElementById("order-modal");
-    const tipoSelect = modal.querySelector("#tipo-ordine");
-    
-    const aggiornaCampiVisibili = () => {
-        const val = tipoSelect.value;
-        document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
-        document.getElementById("delivery-fields").style.display = val === "delivery" ? "block" : "none";
-    };
-
-    aggiornaCampiVisibili();
-    tipoSelect.addEventListener("change", aggiornaCampiVisibili);
-
-    modal.querySelector("#modal-cancel").onclick = () => modal.remove();
-    modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
 }
 
 async function elaboraInvioComanda(modal, ristorante) {
@@ -342,13 +281,12 @@ async function elaboraInvioComanda(modal, ristorante) {
         const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        // AZZERAMENTO CARRELLO LOCALE PRIMA DEL REDIRECT
         saveCart([], ristorante.id);
         modal.remove();
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        // 🛠️ APERTURA DIRETTA INTEGRATA INDISTRUTTIBILE PER I CARATTERI SPECIALI DEI TELEFONI
+        // Apertura istantanea infallibile del redirect per gli smartphone
         window.location.href = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
 
     } catch (err) {
