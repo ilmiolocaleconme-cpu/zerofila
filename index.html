@@ -4,25 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZeroFila - Ordina Online</title>
-  
-  <!-- Collegamento allo stile grafico unificato del menu e del carrello -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- Intestazione dinamica del ristorante -->
   <header class="branding-header">
     <h1 id="restaurant-name">ZeroFila Menu</h1>
   </header>
 
-  <!-- Layout principale dell'applicazione -->
   <div class="app-layout">
-    <!-- Contenitore dinamico dove vengono stampate le categorie e i prodotti del CSV -->
+    <!-- Elenco prodotti -->
     <main id="menu-container">
       <div class="loading-state">Connessione al database...</div>
     </main>
 
-    <!-- Sidebar laterale del carrello per i clienti -->
+    <!-- Sidebar Carrello -->
     <aside id="cart-sidebar">
       <h2>Il tuo Carrello</h2>
       <div id="cart-items"></div>
@@ -37,7 +33,7 @@
     </aside>
   </div>
 
-  <!-- INGRESSO CENTRALIZZATO STANDARD: Pulito, leggero e 100% scalabile per il SaaS -->
+  <!-- Avvio centralizzato SaaS senza file esterni rincorrenti -->
   <script type="module" src="main.js"></script>
 
 </body>
