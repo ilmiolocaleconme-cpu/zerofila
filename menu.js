@@ -399,7 +399,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio su database Supabase
+        // 1. Registrazione ordine su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -418,7 +418,7 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
-        // 2. Inserimento righe prodotti ordinati
+        // 2. Inserimento righe prodotti correlati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -429,7 +429,7 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 3. Formattazione sicura del testo
+        // 3. Composizione del messaggio WhatsApp
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
@@ -454,23 +454,33 @@ async function elaboraInvioComanda(modal) {
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
+        // Ripristina lo stato grafico vuoto del carrello
         saveCart([], currentRistoranteObj.id);
         renderCart(currentRistoranteObj.id);
 
+        // Hide cancel button
         if (cancelBtn) cancelBtn.style.display = "none";
         
         confirmBtn.disabled = false;
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
         confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
 
-        // Click ad azione diretta: i browser mobile NON POSSONO bloccare l'href manuale
+        // 🛠️ ANCORAGGIO NATIVO BINDATO: Forza il salto su app ed azzera i filtri anti-popup
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
             confirmBtn.textContent = "Apertura WhatsApp...";
             modal.remove();
             
             const linkFinaleWH = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
-            window.location.href = linkFinaleWH;
+            
+            const ancoraInvisibile = document.createElement("a");
+            ancoraInvisibile.href = linkFinaleWH;
+            ancoraInvisibile.target = "_top"; // Spinge l'app ad aprirsi sopra il browser mobile
+            ancoraInvisibile.rel = "noopener noreferrer";
+            
+            document.body.appendChild(ancoraInvisibile);
+            ancoraInvisibile.click(); // Spara il click fisico
+            document.body.removeChild(ancoraInvisibile);
         };
 
         showToast("✅ Registrato! Tocca il tasto verde per avviare WhatsApp.", "success");
