@@ -1,5 +1,5 @@
 import { supabaseClient } from './supabase.js';
-import { getRistoranteSlug, escapeHtml, formatPrice, showToast } from './utils.js';
+import { getRistoranteSlug, escapeHtml, showToast } from './utils.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
@@ -8,6 +8,13 @@ const cartTotalElement = document.getElementById("cart-total");
 
 let currentRistoranteObj = null;
 
+// --- FUNZIONE DI FORMATTAZIONE PREZZO INTERNA ANTI-CRASH ---
+function formatPrice(price) {
+    const num = Number(price);
+    return isNaN(num) ? "0.00" : num.toFixed(2);
+}
+
+// --- GESTIONE CORE CARRELLO UNIFICATA MULTI-TENANT ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -69,9 +76,10 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
+// --- LOGICA DI CARICAMENTO PRODOTTI DA SUPABASE ---
 export async function initMenu() {
     if (!menuContainer) return;
-    menuContainer.innerHTML = `<div class="loading-state">Connessione al database...</div>`;
+    menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
 
     const slug = getRistoranteSlug() || "al-panetto";
 
@@ -82,7 +90,7 @@ export async function initMenu() {
             .eq("slug", slug)
             .single();
 
-        if (restError || !ristorante) throw new Error("Attività non trovata nel database.");
+        if (restError || !ristorante) throw new Error("Locale non trovato nel database.");
 
         currentRistoranteObj = ristorante;
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
@@ -103,7 +111,7 @@ export async function initMenu() {
         const prodotti = prodRes.data || [];
 
         if (!categorie.length || !prodotti.length) {
-            menuContainer.innerHTML = `<p class="empty-msg">Il listino è attualmente vuoto.</p>`;
+            menuContainer.innerHTML = `<p class="empty-msg">Il menu è attualmente vuoto.</p>`;
             return;
         }
 
@@ -129,7 +137,7 @@ export async function initMenu() {
                 card.innerHTML = `
                     <div class="prodotto-info">
                         <h3>${escapeHtml(p.nome)}</h3>
-                        <p>${escapeHtml(p.descrizione || 'Farcisci o modifica al click')}</p>
+                        <p>${escapeHtml(p.descrizione || 'Scegli le varianti al click')}</p>
                         <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                     </div>
                     <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}" data-gruppo="${escapeHtml(p.gruppo_extra || '')}" data-forzafarcitura="${isNudo ? 'true' : 'false'}">${testoBottone}</button>
@@ -150,6 +158,7 @@ export async function initMenu() {
     }
 }
 
+// --- APERTURA DELLA FINESTRA DI PERSONALIZZAZIONE (MODALE) ---
 async function apriModaleVarianti(carrelloId) {
     if (!currentRistoranteObj) return;
     let cart = getCartItems(currentRistoranteObj.id);
@@ -248,7 +257,7 @@ async function apriModaleVarianti(carrelloId) {
         chk.addEventListener("change", () => {
             if (vModal.querySelectorAll(".chk-gratis-salsa:checked").length > 3) {
                 chk.checked = false;
-                alert("Puoi scegliere un massimo di 3 salse gratuite!");
+                alert("Puoi scegliere un massimo di 3 opzioni gratuite!");
             }
         });
     });
@@ -290,6 +299,7 @@ async function apriModaleVarianti(carrelloId) {
     };
 }
 
+// --- LOGICA MODALE DATI CLIENTE ---
 function initOrderButtonLogic() {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -389,6 +399,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
+        // 1. Salvataggio su database Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -407,6 +418,7 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
+        // 2. Inserimento righe prodotti ordinati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -417,6 +429,7 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
+        // 3. Formattazione sicura del testo
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
@@ -448,8 +461,9 @@ async function elaboraInvioComanda(modal) {
         
         confirmBtn.disabled = false;
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
-        confirmBtn.innerHTML = "💬 Apri Chat e Invia Comanda";
+        confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
 
+        // Click ad azione diretta: i browser mobile NON POSSONO bloccare l'href manuale
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
             confirmBtn.textContent = "Apertura WhatsApp...";
@@ -471,6 +485,7 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
+// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
