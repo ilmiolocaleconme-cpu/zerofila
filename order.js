@@ -73,7 +73,8 @@ export function initOrderLogic(ristorante) {
         const newBtnProcedi = document.getElementById("send-order");
         
         newBtnProcedi.addEventListener("click", () => {
-            if (getCartItems(ristorante.id).length === 0) {
+            const attualiProdotti = getCartItems(ristorante.id);
+            if (attualiProdotti.length === 0) {
                 showToast("Il carrello è vuoto!", "error");
                 return;
             }
@@ -194,7 +195,7 @@ export async function apriModaleVarianti(carrelloId, ristoranteId) {
         if (radPaneScelto) {
             const nomePane = radPaneScelto.getAttribute("data-nome");
             const prezzoPane = parseFloat(radPaneScelto.getAttribute("data-prezzo"));
-            variazioniList.push("Scelta: " + nomePane);
+            variazioniList.push("Pane: " + nomePane);
             nuovoPrezzoCalcolato += prezzoPane;
         }
 
@@ -221,7 +222,68 @@ export async function apriModaleVarianti(carrelloId, ristoranteId) {
     };
 }
 
-// (Tutto il resto della logica di elaboraInvioComanda rimane agganciato sotto...)
+function showOrderModal(ristorante) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tavoloDalQR = urlParams.get('tavolo');
+
+    const salvatoNome = localStorage.getItem("zf_user_nome") || "";
+    const salvatoTelefono = localStorage.getItem("zf_user_telefono") || "";
+
+    const modalHTML = `
+    <div id="order-modal" class="modal">
+      <div class="modal-content">
+        <h2>Completa il tuo Ordine</h2>
+        
+        <label>Nome e Cognome <span class="required">*</span></label>
+        <input type="text" id="cliente-nome" value="${escapeHtml(salvatoNome)}" placeholder="Mario Rossi" required>
+
+        <label>Tipo di Ordine</label>
+        <select id="tipo-ordine" ${tavoloDalQR ? 'disabled' : ''}>
+          <option value="tavolo" ${tavoloDalQR ? 'selected' : ''}>🪑 Al Tavolo</option>
+          <option value="asporto" ${!tavoloDalQR ? 'selected' : ''}>📦 Asporto</option>
+          <option value="delivery">🚀 Delivery</option>
+        </select>
+
+        <div id="tavolo-fields">
+          <label>N° Tavolo <span class="required">*</span></label>
+          <input type="text" id="tavolo" value="${tavoloDalQR || ''}" ${tavoloDalQR ? 'readonly' : ''} placeholder="Esempio: 5">
+        </div>
+
+        <div id="delivery-fields" style="display:none;">
+          <label>Indirizzo di consegna <span class="required">*</span></label>
+          <input type="text" id="indirizzo" placeholder="Via Roma 123">
+        </div>
+
+        <label>Telefono <span class="required">*</span></label>
+        <input type="tel" id="telefono" value="${escapeHtml(salvatoTelefono)}" placeholder="333 1234567" required>
+
+        <label>Note / Allergie</label>
+        <textarea id="note" rows="3" placeholder="Allergie, preferenze..."></textarea>
+
+        <div class="modal-buttons">
+          <button id="modal-cancel">Annulla</button>
+          <button id="modal-confirm">✅ Invia Ordine</button>
+        </div>
+      </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = document.getElementById("order-modal");
+    const tipoSelect = modal.querySelector("#tipo-ordine");
+    
+    const aggiornaCampiVisibili = () => {
+        const val = tipoSelect.value;
+        document.getElementById("tavolo-fields").style.display = val === "tavolo" ? "block" : "none";
+        document.getElementById("delivery-fields").style.display = val === "delivery" ? "block" : "none";
+    };
+
+    aggiornaCampiVisibili();
+    tipoSelect.addEventListener("change", aggiornaCampiVisibili);
+
+    modal.querySelector("#modal-cancel").onclick = () => modal.remove();
+    modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal, ristorante);
+}
+
 async function elaboraInvioComanda(modal, ristorante) {
     const confirmBtn = modal.querySelector("#modal-confirm");
     confirmBtn.disabled = true;
@@ -280,23 +342,14 @@ async function elaboraInvioComanda(modal, ristorante) {
         const numeroLocale = (ristorante && ristorante.telefono) ? ristorante.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
+        // AZZERAMENTO CARRELLO LOCALE PRIMA DEL REDIRECT
         saveCart([], ristorante.id);
         modal.remove();
         renderCart(ristorante.id);
         showToast("✅ Ordine registrato!");
 
-        const endpointWhatsApp = new URL("https://whatsapp.com");
-        endpointWhatsApp.searchParams.set("phone", telefonoFinale);
-        endpointWhatsApp.searchParams.set("text", msg);
-
-        const linkWhatsApp = document.createElement("a");
-        linkWhatsApp.href = endpointWhatsApp.toString();
-        linkWhatsApp.target = "_top";
-        linkWhatsApp.rel = "noopener noreferrer";
-        
-        document.body.appendChild(linkWhatsApp);
-        linkWhatsApp.click();
-        document.body.removeChild(linkWhatsApp);
+        // 🛠️ APERTURA DIRETTA INTEGRATA INDISTRUTTIBILE PER I CARATTERI SPECIALI DEI TELEFONI
+        window.location.href = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
 
     } catch (err) {
         console.error(err);
