@@ -8,13 +8,11 @@ const cartTotalElement = document.getElementById("cart-total");
 
 let currentRistoranteObj = null;
 
-// --- FUNZIONE DI FORMATTAZIONE PREZZO INTERNA ANTI-CRASH ---
 function formatPrice(price) {
     const num = Number(price);
     return isNaN(num) ? "0.00" : num.toFixed(2);
 }
 
-// --- GESTIONE CORE CARRELLO UNIFICATA MULTI-TENANT ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -76,7 +74,6 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
-// --- LOGICA DI CARICAMENTO PRODOTTI DA SUPABASE ---
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -158,7 +155,6 @@ export async function initMenu() {
     }
 }
 
-// --- APERTURA DELLA FINESTRA DI PERSONALIZZAZIONE (MODALE) ---
 async function apriModaleVarianti(carrelloId) {
     if (!currentRistoranteObj) return;
     let cart = getCartItems(currentRistoranteObj.id);
@@ -349,7 +345,7 @@ function showOrderModal() {
         <textarea id="note" rows="3" placeholder="Allergie, preferenze..."></textarea>
         <div class="modal-buttons">
           <button id="modal-cancel">Annulla</button>
-          <button id="modal-confirm">✅ Invia Ordine</button>
+          <button id="modal-confirm">✅ 1. Registra Comanda</button>
         </div>
       </div>
     </div>`;
@@ -373,8 +369,6 @@ function showOrderModal() {
 
 async function elaboraInvioComanda(modal) {
     const confirmBtn = modal.querySelector("#modal-confirm");
-    const cancelBtn = modal.querySelector("#modal-cancel");
-    
     confirmBtn.disabled = true;
     confirmBtn.textContent = "⏳ Registrazione ordine...";
 
@@ -398,7 +392,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Registrazione ordine nel database Supabase
+        // STEP 1: Scrittura comanda su Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -417,7 +411,6 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
-        // 2. Inserimento prodotti correlati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -428,7 +421,7 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 3. Composizione del messaggio di testo per l'insegna
+        // STEP 2: Composizione del testo dell'ordine
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
@@ -453,40 +446,48 @@ async function elaboraInvioComanda(modal) {
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        // Azzera la grafica del carrello
+        // Pulisce la memoria locale del carrello
         saveCart([], currentRistoranteObj.id);
-        renderCart(currentRistoranteObj.id);
+        modal.remove();
 
-        if (cancelBtn) cancelBtn.style.display = "none";
+        // 🚀 STEP 3: COSTRUZIONE DELL'INTERFACCIA FISSA WHATSAPP (A prova di blocco pop-up)
+        const linkPrivatoSaaS = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
         
-        confirmBtn.disabled = false;
-        confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
-        confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
+        // Trasforma interamente l'area carrello in un pulsante nativo gigante a tutto schermo
+        if (cartContainer) {
+            cartContainer.innerHTML = `
+                <div style="padding:40px 20px; text-align:center; background:#0f172a; border-radius:12px; border:2px dashed #25D366; margin:20px 0;">
+                    <h3 style="color:#10b981; margin-top:0;">✅ ORDINE REGISTRATO IN CUCINA!</h3>
+                    <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:25px;">La comanda è già sul monitor dello chef. Clicca adesso sul pulsante verde qui sotto per aprire la chat ed inviare la copia dell'ordine sul telefono del locale.</p>
+                    <a href="${linkPrivatoSaaS}" target="_top" style="display:block; text-align:center; padding:18px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:10px; text-decoration:none; box-shadow: 0 10px 20px rgba(37,211,102,0.4); animation: pulse 2s infinite;">💬 INVIA SU WHATSAPP ORA</a>
+                </div>
+            `;
+        }
+        
+        // Nasconde o aggiorna i vecchi tasti inferiori per evitare doppi click
+        const footerTasto = document.getElementById("send-order");
+        if (footerTasto) {
+            footerTasto.replaceWith(footerTasto.cloneNode(true));
+            const nuovoTastoFinto = document.getElementById("send-order");
+            nuovoTastoFinto.style.background = "#334155";
+            nuovoTastoFinto.style.color = "#94a3b8";
+            nuovoTastoFinto.disabled = true;
+            nuovoTastoFinto.textContent = "✅ Ordine Confermato";
+        }
+        if (cartTotalElement) cartTotalElement.textContent = "€ 0.00";
 
-        // 🛠️ FUNZIONE DI REDIRECT DIRETTO INTEGRATO CON PROTOCOLLO /SEND/ CORRETTO
-        confirmBtn.onclick = () => {
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = "Apertura WhatsApp...";
-            modal.remove();
-            
-            // Indirizzo ufficiale standard ://whatsapp.com con slash forzato anti-crash mobile
-            const linkPrivatoSaaS = "https://://whatsapp.com/send/?phone=" + telefonoFinale + "&text=" + encodeURIComponent(msg);
-            window.location.href = linkPrivatoSaaS;
-        };
-
-        showToast("✅ Registrato! Tocca il tasto verde per avviare WhatsApp.", "success");
+        showToast("✅ Ordine salvato! Tocca il pulsante verde nel carrello per aprire WhatsApp.", "success");
 
     } catch (err) {
         console.error(err);
         showToast("❌ Errore procedura: " + err.message, "error");
         if (confirmBtn) {
             confirmBtn.disabled = false;
-            confirmBtn.textContent = "✅ Invia Ordine";
+            confirmBtn.textContent = "✅ 1. Registra Comanda";
         }
     }
 }
 
-// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
