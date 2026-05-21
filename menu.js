@@ -141,8 +141,12 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        renderCart(ristorante.id);
-        initOrderButtonLogic();
+        // SINTONIZZATO ALLA VERSIONE 60 PER PREVENIRE CONFLITTI DI CACHE
+        const orderMod = await import(`./order.js?v=60`);
+        if (orderMod && typeof orderMod.renderCart === "function") {
+            orderMod.renderCart(ristorante.id);
+            orderMod.initOrderLogic(ristorante);
+        }
 
     } catch (err) {
         console.error(err);
@@ -417,7 +421,6 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // PROTEZIONE TOTALE INSEGNA: Accetta sia 'nome' che 'name'
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
@@ -451,12 +454,12 @@ async function elaboraInvioComanda(modal) {
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
         confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
 
-        // Protocollo Location Href Diretto: Infallibile contro i blocchi mobile
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
             confirmBtn.textContent = "Apertura WhatsApp...";
             modal.remove();
             
+            // REDIRECT SU APP NATIVA SENZA CONFLITTI DI MEMORIA DI FINESTRA
             const linkFinaleWH = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
             window.location.href = linkFinaleWH;
         };
@@ -473,6 +476,7 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
+// SINTONIZZATO ALLA VERSIONE 60 PER PREVENIRE CONFLITTI DI CACHE
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
