@@ -8,7 +8,6 @@ const cartTotalElement = document.getElementById("cart-total");
 
 let currentRistoranteObj = null;
 
-// --- GESTIONE CORE CARRELLO UNIFICATA MULTI-TENANT ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -70,7 +69,6 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
-// --- LOGICA DI CARICAMENTO PRODOTTI DA SUPABASE ---
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -152,7 +150,6 @@ export async function initMenu() {
     }
 }
 
-// --- APERTURA DELLA FINESTRA DI PERSONALIZZAZIONE (MODALE) ---
 async function apriModaleVarianti(carrelloId) {
     if (!currentRistoranteObj) return;
     let cart = getCartItems(currentRistoranteObj.id);
@@ -293,7 +290,6 @@ async function apriModaleVarianti(carrelloId) {
     };
 }
 
-// --- LOGICA MODALE DATI CLIENTE ---
 function initOrderButtonLogic() {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -393,7 +389,6 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio su database Supabase
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -412,7 +407,6 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
-        // 2. Inserimento prodotti ordinati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -423,7 +417,7 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 3. PROTEZIONE DI SICUREZZA INSEGNA: Accetta sia 'nome' che 'name' dal database senza crash
+        // PROTEZIONE TOTALE INSEGNA: Accetta sia 'nome' che 'name'
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
@@ -448,28 +442,26 @@ async function elaboraInvioComanda(modal) {
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        // Svuota la memoria del carrello locale
         saveCart([], currentRistoranteObj.id);
         renderCart(currentRistoranteObj.id);
 
-        // 🚀 STRUTTURA AD AZIONE DIRETTA INSERITA: Attiva il secondo click manuale indistruttibile
         if (cancelBtn) cancelBtn.style.display = "none";
         
         confirmBtn.disabled = false;
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
         confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
 
-        // Click fisico forzato: bypassa i filtri di pop-up di Android, iOS, Chrome e Safari
+        // Protocollo Location Href Diretto: Infallibile contro i blocchi mobile
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
             confirmBtn.textContent = "Apertura WhatsApp...";
             modal.remove();
             
             const linkFinaleWH = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
-            window.open(linkFinaleWH, "_top"); // Spinge l'app ad aprirsi sopra il browser in un millisecondo
+            window.location.href = linkFinaleWH;
         };
 
-        showToast("✅ Salvato nel database! Clicca il pulsante verde per confermare l'invio.", "success");
+        showToast("✅ Registrato! Tocca il tasto verde per avviare WhatsApp.", "success");
 
     } catch (err) {
         console.error(err);
@@ -481,7 +473,6 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
-// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
