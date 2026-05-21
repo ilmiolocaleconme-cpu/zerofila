@@ -1,29 +1,56 @@
-// utils.js
+// Funzioni di utilità globali per l'interfaccia ZeroFila
+
 export function getRistoranteSlug() {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('r')) return urlParams.get('r');
-    const parts = window.location.pathname.split('/').filter(Boolean);
-    return parts[0] || null;
+    return urlParams.get('r') || "al-panetto";
 }
 
-export function escapeHtml(text) {
-    if (!text) return "";
-    return text.toString()
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+export function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 export function formatPrice(price) {
-    return Number(price || 0).toFixed(2);
+    const num = Number(price);
+    return isNaN(num) ? "0.00" : num.toFixed(2);
 }
 
 export function showToast(message, type = "success") {
+    // Rileva se esiste già un vecchio box di notifica e lo rimuove
+    const vecchioBox = document.getElementById("status-error-box");
+    if (vecchioBox) vecchioBox.remove();
+
     const toast = document.createElement("div");
-    toast.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;color:#fff;z-index:10000;background:${type === "success" ? "#10b981" : "#ef4444"};`;
+    toast.id = "status-error-box";
+    
+    // Grafica elegante scura adattiva
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'error' ? '#ef4444' : '#10b981'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: bold;
+        z-index: 999999;
+        font-size: 0.9rem;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+        text-align: center;
+        max-width: 90%;
+    `;
+    
     toast.textContent = message;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    
+    // Scompare in automatico dopo 3.5 secondi
+    setTimeout(() => {
+        if (toast) toast.remove();
+    }, 3500);
 }
