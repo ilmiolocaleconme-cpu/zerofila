@@ -7,7 +7,7 @@ let currentRistorante = null;
 const audioPlayer = new Audio();
 audioPlayer.volume = 0.85;
 
-// Funzione interna di sicurezza per pulire l'HTML senza moduli esterni
+// Funzione interna per ripulire l'HTML in modo sicuro e senza crash
 function escapeHtmlInfallibile(str) {
     if (!str) return '';
     return String(str)
@@ -18,9 +18,15 @@ function escapeHtmlInfallibile(str) {
         .replace(/'/g, '&#039;');
 }
 
+// Formatta il prezzo in euro senza dipendere da utils esterni
+function formatPriceInfallibile(price) {
+    const num = Number(price);
+    return isNaN(num) ? "0.00" : num.toFixed(2);
+}
+
 function playNewOrderSound() {
     audioPlayer.src = "https://mixkit.co";
-    audioPlayer.play().catch((e) => console.log("Audio in attesa:", e));
+    audioPlayer.play().catch((e) => console.log("Audio in attesa di sblocco utente:", e));
 }
 
 if (enableAudioBtn) {
@@ -77,31 +83,40 @@ function renderKitchenOrders(ordini) {
         grid.className = "orders-grid";
 
         if (lista.length === 0) {
-            grid.innerHTML = `<p class="no-orders">Nessun ordine</p>`;
+            grid.innerHTML = `<p class="no-orders" style="color:#64748b; font-style:italic; padding:10px;">Nessun ordine</p>`;
         }
 
         lista.forEach(o => {
             const card = document.createElement("div");
             card.className = `ordine-card`;
+            card.style.cssText = "background:#1e293b; padding:15px; border-radius:10px; margin-bottom:12px; border:1px solid #334155; color:white;";
+            
             card.innerHTML = `
-                <div class="card-header">
-                    <h3 style="margin:0;">#${o.id.toString().slice(-4)}</h3>
-                    <span class="badge">${o.tipo_ordine}</span>
+                <div class="card-header" style="display:flex; justify-content:between; align-items:center; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:8px;">
+                    <h3 style="margin:0; color:#38bdf8;">#${o.id.toString().slice(-4)}</h3>
+                    <span class="badge" style="background:#475569; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; margin-left:auto;">${o.tipo_ordine.toUpperCase()}</span>
                 </div>
-                <p style="margin:4px 0;"><strong>Cliente:</strong> ${escapeHtmlInfallibile(o.nome_cliente || "Anonimo")}</p>
-                ${o.tavolo ? `<p style="margin:4px 0;"><strong>🪑 Tavolo:</strong> ${escapeHtmlInfallibile(o.tavolo)}</p>` : ''}
-                ${o.indirizzo ? `<p style="margin:4px 0;"><strong>📍 Dom:</strong> ${escapeHtmlInfallibile(o.indirizzo)}</p>` : ''}
-                <ul class="prodotti-list">
+                <p style="margin:4px 0; font-size:0.9rem;"><strong>Cliente:</strong> ${escapeHtmlInfallibile(o.nome_cliente || "Anonimo")}</p>
+                ${o.tavolo ? `<p style="margin:4px 0; font-size:0.9rem;"><strong>🪑 Tavolo:</strong> ${escapeHtmlInfallibile(o.tavolo)}</p>` : ''}
+                ${o.indirizzo ? `<p style="margin:4px 0; font-size:0.9rem;"><strong>📍 Indirizzo:</strong> ${escapeHtmlInfallibile(o.indirizzo)}</p>` : ''}
+                
+                <ul class="prodotti-list" style="margin:10px 0; padding-left:15px; font-size:0.95rem; color:#f1f5f9;">
                     ${(o.ordine_prodotti || []).map(p => `
-                        <li>${p.quantita}x <strong>${escapeHtmlInfallibile(p.nome_prodotto)}</strong> ${p.modifiche ? `<br><small style="color:#eab308;">[${escapeHtmlInfallibile(p.modifiche)}]</small>` : ''}</li>
+                        <li style="margin-bottom:6px;">${p.quantita}x <strong>${escapeHtmlInfallibile(p.nome_prodotto)}</strong> - <small>€ ${formatPriceInfallibile(p.prezzo)}</small> ${p.modifiche ? `<br><small style="color:#eab308; font-weight:bold;">↳ [${escapeHtmlInfallibile(p.modifiche)}]</small>` : ''}</li>
                     `).join('')}
                 </ul>
-                ${o.note ? `<p style="margin:6px 0; font-size:0.85rem; color:#94a3b8; border-top:1px dashed #334155; padding-top:4px;">📝 <strong>Note:</strong> ${escapeHtmlInfallibile(o.note)}</p>` : ''}
-                <select onchange="window.gestisciCambioStatoCucina('${o.id}', this.value, this)" style="width:100%; padding:8px; background:#1e293b; color:#fff; border:1px solid #475569; border-radius:4px;">
+                
+                ${o.note ? `<p style="margin:6px 0; font-size:0.85rem; color:#94a3b8; border-top:1px solid #334155; padding-top:6px;">📝 <strong>Note:</strong> ${escapeHtmlInfallibile(o.note)}</p>` : ''}
+                
+                <div style="margin-top:12px; border-top:1px solid #334155; padding-top:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold; color:#10b981;">Tot: € ${formatPriceInfallibile(o.totale)}</span>
+                </div>
+                
+                <select onchange="window.gestisciCambioStatoCucina('${o.id}', this.value, this)" style="width:100%; padding:10px; margin-top:10px; background:#0f172a; color:#fff; border:1px solid #475569; border-radius:6px; font-size:0.9rem; cursor:pointer;">
                     <option value="ricevuto" ${o.stato === "ricevuto" ? "selected" : ""}>Ricevuto</option>
                     <option value="preparazione" ${o.stato === "preparazione" ? "selected" : ""}>In Preparazione</option>
-                    <option value="pronto" ${o.stato === "pronto" ? "selected" : ""}>Pronto</option>
-                    <option value="consegnato" ${o.stato === "consegnato" ? "selected" : ""}>Consegnato</option>
+                    <option value="pronto" ${o.stato === "pronto" ? "selected" : ""}>Pronto / Ritiro</option>
+                    <option value="consegnato" ${o.stato === "consegnato" ? "selected" : ""}>Consegnato / Chiuso</option>
                 </select>
             `;
             grid.appendChild(card);
@@ -118,14 +133,14 @@ window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectEl
 
         const { data: ordineAggiornato, error } = await supabaseClient
             .from("ordini")
-            .update({ stato: nuevoStato })
+            .update({ stato: nuovoStato })
             .eq("id", ordineId)
             .select()
             .single();
         
         if (error) throw error;
         
-        // LOGICA DI NOTIFICA WHATSAPP GRATUITA UNIFICATA INTEGRATA
+        // --- LOGICA NOTIFICA WHATSAPP CLIENTE AUTOMATICA INTEGRATA ---
         if (nuovoStato === "preparazione" || nuovoStato === "pronto") {
             const nomeInsegna = currentRistorante.nome || "ZeroFila";
             let testoNotifica = `Ciao *${ordineAggiornato.nome_cliente}*, aggiornamento da *${nomeInsegna.toUpperCase()}*! 🍔\n\n`;
@@ -142,9 +157,9 @@ window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectEl
                 if (ordineAggiornato.tipo_ordine === "tavolo") {
                     testoNotifica += `🟢 I tuoi piatti sono pronti! Il cameriere li sta portando al tuo tavolo. Buon appetito!`;
                 } else if (ordineAggiornato.tipo_ordine === "asporto") {
-                    testoNotifica += `🟢 *ORDINE PRONTO!* Puoi avvicinarti alla cassa per il ritiro.`;
+                    testoNotifica += `🟢 *ORDINE PRONTO!* Puoi avvicinarti al banco per il ritiro della tua comanda.`;
                 } else if (ordineAggiornato.tipo_ordine === "delivery") {
-                    testoNotifica += `🛵 *SIAMO IN CONSEGNA!* Il tuo ordine è partito verso: _${ordineAggiornato.indirizzo || ''}_.`;
+                    testoNotifica += `🛵 *SIAMO IN CONSEGNA!* Il tuo ordine è partito verso l'indirizzo: _${ordineAggiornato.indirizzo || ''}_.`;
                 }
             }
             testoNotifica += `\n\nInviato tramite *ZeroFila* ✨`;
@@ -152,19 +167,13 @@ window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectEl
             const numeroCliente = ordineAggiornato.telefono.toString().replace(/\s+/g, '').replace('+', '');
             const telefonoFinaleCliente = numeroCliente.startsWith("39") ? numeroCliente : "39" + numeroCliente;
 
-            const linkWhatsApp = document.createElement("a");
-            linkWhatsApp.href = "https://whatsapp.com" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
-            linkWhatsApp.target = "_blank";
-            linkWhatsApp.rel = "noopener noreferrer";
-            
-            document.body.appendChild(linkWhatsApp);
-            linkWhatsApp.click();
-            document.body.removeChild(linkWhatsApp);
+            // Spinge l'apertura del redirect immediato del browser
+            window.location.href = "https://whatsapp.com" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
         }
 
         await loadOrders(false);
     } catch (err) {
-        console.error(err);
+        console.error("Errore aggiornamento stato:", err);
         selectElement.disabled = false;
     }
 };
@@ -184,7 +193,7 @@ export async function initKitchen() {
         
         await loadOrders(false);
 
-        // Rilevamento comande in ingresso Realtime
+        // Ascolto Realtime su canale Postgres per l'ingresso istantaneo delle comande
         supabaseClient.channel("kitchen-realtime")
             .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: "ristorante_id=eq." + risto.id }, () => {
                 loadOrders(true);
@@ -194,7 +203,7 @@ export async function initKitchen() {
     } catch (err) {
         console.error(err);
         if (kitchenContainer) {
-            kitchenContainer.innerHTML = `<p style="color:#ef4444; font-weight:bold; padding:20px;">❌ ERRORE: Connessione fallita. Controlla lo slug nell'URL.</p>`;
+            kitchenContainer.innerHTML = `<p style="color:#ef4444; font-weight:bold; padding:20px; text-align:center;">❌ ERRORE: Connessione fallita. Controlla lo slug nell'URL.</p>`;
         }
     }
 }
