@@ -1,5 +1,4 @@
 import { supabaseClient } from './supabase.js';
-import { getRistoranteSlug, escapeHtml, showToast } from './utils.js';
 
 const kitchenContainer = document.getElementById("kitchen-orders");
 const enableAudioBtn = document.getElementById("enable-audio");
@@ -7,6 +6,17 @@ const enableAudioBtn = document.getElementById("enable-audio");
 let currentRistorante = null;
 const audioPlayer = new Audio();
 audioPlayer.volume = 0.85;
+
+// Funzione interna di sicurezza per pulire l'HTML senza moduli esterni
+function escapeHtmlInfallibile(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 function playNewOrderSound() {
     audioPlayer.src = "https://mixkit.co";
@@ -78,15 +88,15 @@ function renderKitchenOrders(ordini) {
                     <h3 style="margin:0;">#${o.id.toString().slice(-4)}</h3>
                     <span class="badge">${o.tipo_ordine}</span>
                 </div>
-                <p style="margin:4px 0;"><strong>Cliente:</strong> ${escapeHtml(o.nome_cliente || "Anonimo")}</p>
-                ${o.tavolo ? `<p style="margin:4px 0;"><strong>🪑 Tavolo:</strong> ${escapeHtml(o.tavolo)}</p>` : ''}
-                ${o.indirizzo ? `<p style="margin:4px 0;"><strong>📍 Dom:</strong> ${escapeHtml(o.indirizzo)}</p>` : ''}
+                <p style="margin:4px 0;"><strong>Cliente:</strong> ${escapeHtmlInfallibile(o.nome_cliente || "Anonimo")}</p>
+                ${o.tavolo ? `<p style="margin:4px 0;"><strong>🪑 Tavolo:</strong> ${escapeHtmlInfallibile(o.tavolo)}</p>` : ''}
+                ${o.indirizzo ? `<p style="margin:4px 0;"><strong>📍 Dom:</strong> ${escapeHtmlInfallibile(o.indirizzo)}</p>` : ''}
                 <ul class="prodotti-list">
                     ${(o.ordine_prodotti || []).map(p => `
-                        <li>${p.quantita}x <strong>${escapeHtml(p.nome_prodotto)}</strong> ${p.modifiche ? `<br><small style="color:#eab308;">[${escapeHtml(p.modifiche)}]</small>` : ''}</li>
+                        <li>${p.quantita}x <strong>${escapeHtmlInfallibile(p.nome_prodotto)}</strong> ${p.modifiche ? `<br><small style="color:#eab308;">[${escapeHtmlInfallibile(p.modifiche)}]</small>` : ''}</li>
                     `).join('')}
                 </ul>
-                <!-- Menu di selezione stato che attiva la notifica automatica al click -->
+                ${o.note ? `<p style="margin:6px 0; font-size:0.85rem; color:#94a3b8; border-top:1px dashed #334155; padding-top:4px;">📝 <strong>Note:</strong> ${escapeHtmlInfallibile(o.note)}</p>` : ''}
                 <select onchange="window.gestisciCambioStatoCucina('${o.id}', this.value, this)" style="width:100%; padding:8px; background:#1e293b; color:#fff; border:1px solid #475569; border-radius:4px;">
                     <option value="ricevuto" ${o.stato === "ricevuto" ? "selected" : ""}>Ricevuto</option>
                     <option value="preparazione" ${o.stato === "preparazione" ? "selected" : ""}>In Preparazione</option>
@@ -102,44 +112,54 @@ function renderKitchenOrders(ordini) {
     });
 }
 
-// Funzione core di transazione e notifica automatica gratuita a portata di click
 window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectElement) {
     try {
         selectElement.disabled = true;
 
-        // 1. Aggiorna lo stato dell'ordine sul database Supabase
         const { data: ordineAggiornato, error } = await supabaseClient
             .from("ordini")
-            .update({ stato: nuovoStato })
+            .update({ stato: nuevoStato })
             .eq("id", ordineId)
             .select()
             .single();
         
         if (error) throw error;
         
-        // 2. Se lo stato diventa "In Preparazione" o "Pronto", spara la notifica WhatsApp gratis
+        // LOGICA DI NOTIFICA WHATSAPP GRATUITA UNIFICATA INTEGRATA
         if (nuovoStato === "preparazione" || nuovoStato === "pronto") {
-            const moduloMessaggi = await import(`./messaggi.js`);
-            const testoNotifica = moduloMessaggi.componiNotificaStatoWhatsApp(
-                ordineAggiornato.nome_cliente,
-                ordineAggiornato.tipo_ordine,
-                nuovoStato,
-                ordineAggiornato.tavolo,
-                ordineAggiornato.indirizzo,
-                currentRistorante.nome
-            );
+            const nomeInsegna = currentRistorante.nome || "ZeroFila";
+            let testoNotifica = `Ciao *${ordineAggiornato.nome_cliente}*, aggiornamento da *${nomeInsegna.toUpperCase()}*! 🍔\n\n`;
 
-            // Pulisce e formatta il numero di telefono del cliente inserito nell'ordine
+            if (nuovoStato === "preparazione") {
+                if (ordineAggiornato.tipo_ordine === "tavolo") {
+                    testoNotifica += `👨‍🍳 I tuoi piatti sono in preparazione e ti verranno serviti a breve al *Tavolo ${ordineAggiornato.tavolo || ''}*.`;
+                } else if (ordineAggiornato.tipo_ordine === "asporto") {
+                    testoNotifica += `📦 Stiamo preparando il tuo ordine da asporto! A breve sarà pronto per il ritiro.`;
+                } else if (ordineAggiornato.tipo_ordine === "delivery") {
+                    testoNotifica += `🚀 I tuoi piatti sono in preparazione! Il rider si sta preparando per la consegna.`;
+                }
+            } else if (nuovoStato === "pronto") {
+                if (ordineAggiornato.tipo_ordine === "tavolo") {
+                    testoNotifica += `🟢 I tuoi piatti sono pronti! Il cameriere li sta portando al tuo tavolo. Buon appetito!`;
+                } else if (ordineAggiornato.tipo_ordine === "asporto") {
+                    testoNotifica += `🟢 *ORDINE PRONTO!* Puoi avvicinarti alla cassa per il ritiro.`;
+                } else if (ordineAggiornato.tipo_ordine === "delivery") {
+                    testoNotifica += `🛵 *SIAMO IN CONSEGNA!* Il tuo ordine è partito verso: _${ordineAggiornato.indirizzo || ''}_.`;
+                }
+            }
+            testoNotifica += `\n\nInviato tramite *ZeroFila* ✨`;
+
             const numeroCliente = ordineAggiornato.telefono.toString().replace(/\s+/g, '').replace('+', '');
             const telefonoFinaleCliente = numeroCliente.startsWith("39") ? numeroCliente : "39" + numeroCliente;
 
-            // Genera il link WhatsApp Web ufficiale per il computer della cucina
-            const endpointNotifica = new URL("https://whatsapp.com");
-            endpointWhatsApp.searchParams.set("phone", telefonoFinaleCliente);
-            endpointWhatsApp.searchParams.set("text", testoNotifica);
-
-            // Apre l'invio in una nuova scheda dello schermo cucina in background senza scombinare la griglia
-            window.open(endpointNotifica.toString(), '_blank');
+            const linkWhatsApp = document.createElement("a");
+            linkWhatsApp.href = "https://whatsapp.com" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
+            linkWhatsApp.target = "_blank";
+            linkWhatsApp.rel = "noopener noreferrer";
+            
+            document.body.appendChild(linkWhatsApp);
+            linkWhatsApp.click();
+            document.body.removeChild(linkWhatsApp);
         }
 
         await loadOrders(false);
@@ -153,25 +173,28 @@ export async function initKitchen() {
     const slug = getRistoranteSlug();
 
     try {
-        const { data: ristorante, error } = await supabaseClient
+        const { data: risto, error } = await supabaseClient
             .from("ristoranti")
             .select("*")
             .eq("slug", slug)
             .single();
 
-        if (error || !ristorante) throw new Error("Ristorante non trovato");
-        currentRistorante = ristorante;
+        if (error || !risto) throw new Error("Ristorante non trovato");
+        currentRistorante = risto;
         
         await loadOrders(false);
 
-        // Ascolta solo i nuovi ordini in ingresso per evitare rallentamenti
+        // Rilevamento comande in ingresso Realtime
         supabaseClient.channel("kitchen-realtime")
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: `ristorante_id=eq.${ristorante.id}` }, () => {
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: "ristorante_id=eq." + risto.id }, () => {
                 loadOrders(true);
             })
             .subscribe();
 
     } catch (err) {
         console.error(err);
+        if (kitchenContainer) {
+            kitchenContainer.innerHTML = `<p style="color:#ef4444; font-weight:bold; padding:20px;">❌ ERRORE: Connessione fallita. Controlla lo slug nell'URL.</p>`;
+        }
     }
 }
