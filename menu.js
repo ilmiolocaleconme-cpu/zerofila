@@ -76,7 +76,7 @@ export async function initMenu() {
             menuContainer.appendChild(section);
         });
 
-        const orderMod = await import(`./order.js?v=10.0.0`);
+        const orderMod = await import(`./order.js?v=12.0.0`);
         if (orderMod && typeof orderMod.renderCart === "function") {
             orderMod.renderCart(ristorante.id);
             orderMod.initOrderLogic(ristorante);
