@@ -7,7 +7,6 @@ let currentRistorante = null;
 const audioPlayer = new Audio();
 audioPlayer.volume = 0.85;
 
-// Protezione e sanitizzazione HTML interna anti-crash
 function escapeHtmlInfallibile(str) {
     if (!str) return '';
     return String(str)
@@ -25,7 +24,7 @@ function formatPriceInfallibile(price) {
 
 function playNewOrderSound() {
     audioPlayer.src = "https://mixkit.co";
-    audioPlayer.play().catch((e) => console.log("Audio in attesa di sblocco utente:", e));
+    audioPlayer.play().catch((e) => console.log("Audio in attesa:", e));
 }
 
 if (enableAudioBtn) {
@@ -101,7 +100,7 @@ function renderKitchenOrders(ordini) {
                 
                 <ul class="prodotti-list" style="margin:10px 0; padding-left:15px; font-size:0.95rem; color:#f1f5f9;">
                     ${(o.ordine_prodotti || []).map(p => `
-                        <li style="margin-bottom:6px;">${p.quantita}x <strong>${escapeHtmlInfallibile(p.nome_prodotto)}</strong> - <small>€ ${formatPriceInfallibile(p.prezzo)}</small> ${p.modifiche ? `<br><small style="color:#eab308; font-weight:bold;">↳ [${escapeHtmlInfallibile(p.modifiche)}]</small>` : ''}</li>
+                        <li style="margin-bottom:6px;">${p.quantita}x <strong>${escapeHtmlInfallibile(p.nome_prodotto)}</strong> ${p.modifiche ? `<br><small style="color:#eab308; font-weight:bold;">↳ [${escapeHtmlInfallibile(p.modifiche)}]</small>` : ''}</li>
                     `).join('')}
                 </ul>
                 
@@ -139,41 +138,43 @@ window.gestisciCambioStatoCucina = async function(ordineId, nuovoStato, selectEl
         
         if (error) throw error;
         
-        // --- LOGICA NOTIFICA AUTOMATICA WHATSAPP DAL MONITOR IN CUCINA ---
         if (nuovoStato === "preparazione" || nuovoStato === "pronto") {
             const nomeInsegna = currentRistorante.nome || currentRistorante.name || "ZeroFila";
-            let testoNotifica = `Ciao *${ordineAggiornato.nome_cliente}*, aggiornamento in tempo reale da *${nomeInsegna.toUpperCase()}*! 🍔\n`;
-            testoNotifica += `-------------------------------------------\n\n`;
+            let testoNotifica = `Ciao *${ordineAggiornato.nome_cliente}*, aggiornamento comanda da *${nomeInsegna.toUpperCase()}*! 🍔\n\n`;
 
             if (nuovoStato === "preparazione") {
                 if (ordineAggiornato.tipo_ordine === "tavolo") {
                     testoNotifica += `👨‍🍳 I tuoi piatti sono in preparazione e ti verranno serviti a breve al *Tavolo ${ordineAggiornato.tavolo || ''}*.`;
                 } else if (ordineAggiornato.tipo_ordine === "asporto") {
-                    testoNotifica += `📦 Lo chef ha preso in carico la comanda! Stiamo preparando il tuo asporto.`;
+                    testoNotifica += `📦 Lo chef ha preso in carico l'ordine! Stiamo preparando il tuo asporto.`;
                 } else if (ordineAggiornato.tipo_ordine === "delivery") {
-                    testoNotifica += `🚀 I tuoi prodotti sono in preparazione! Il rider si sta preparando per il viaggio.`;
+                    testoNotifica += `🚀 I tuoi piatti sono in preparazione! Il rider sta scaldando i motori.`;
                 }
             } else if (nuovoStato === "pronto") {
                 if (ordineAggiornato.tipo_ordine === "tavolo") {
                     testoNotifica += `🟢 I tuoi piatti sono pronti! Il cameriere li sta portando al tuo tavolo. Buon appetito!`;
                 } else if (ordineAggiornato.tipo_ordine === "asporto") {
-                    testoNotifica += `🟢 *ORDINE PRONTO!* Puoi avvicinarti al banco per il ritiro.`;
+                    testoNotifica += `🟢 *ORDINE PRONTO!* Puoi avvicinarti al banco per il ritiro della comanda.`;
                 } else if (ordineAggiornato.tipo_ordine === "delivery") {
-                    testoNotifica += `🛵 *SIAMO IN VIAGGIO!* Il tuo ordine è partito verso: _${ordineAggiornato.indirizzo || ''}_.`;
+                    testoNotifica += `🛵 *SIAMO IN VIAGGIO!* Il tuo ordine è partito verso l'indirizzo: _${ordineAggiornato.indirizzo || ''}_.`;
                 }
             }
-            testoNotifica += `\n\nOrdinato comodamente con *ZeroFila* ✨`;
+            testoNotifica += `\n\nInviato tramite *ZeroFila* ✨`;
 
             const numeroCliente = ordineAggiornato.telefono.toString().replace(/\s+/g, '').replace('+', '');
             const telefonoFinaleCliente = numeroCliente.startsWith("39") ? numeroCliente : "39" + numeroCliente;
 
-            // Forza l'apertura istantanea della notifica del cliente su WhatsApp Web o App
-            window.location.href = "https://whatsapp.com" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
+            const scorciatoiaWH = document.createElement("a");
+            scorciatoiaWH.href = "https://whatsapp.com" + telefonoFinaleCliente + "&text=" + encodeURIComponent(testoNotifica);
+            scorciatoiaWH.target = "_top";
+            document.body.appendChild(scorciatoiaWH);
+            scorciatoiaWH.click();
+            document.body.removeChild(scorciatoiaWH);
         }
 
         await loadOrders(false);
     } catch (err) {
-        console.error("Errore aggiornamento stato cucina:", err);
+        console.error("Errore aggiornamento stato:", err);
         selectElement.disabled = false;
     }
 };
@@ -193,9 +194,10 @@ export async function initKitchen() {
         
         await loadOrders(false);
 
-        // Ascolto in tempo reale (Websocket) per far suonare e caricare i piatti istantaneamente
-        supabaseClient.channel("kitchen-realtime")
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: "ristorante_id=eq." + risto.id }, () => {
+        // Canale realtime corretto senza errori di stringhe per Postgres
+        supabaseClient
+            .channel("public:ordini")
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "ordini", filter: `ristorante_id=eq.${risto.id}` }, () => {
                 loadOrders(true);
             })
             .subscribe();
@@ -203,7 +205,7 @@ export async function initKitchen() {
     } catch (err) {
         console.error(err);
         if (kitchenContainer) {
-            kitchenContainer.innerHTML = `<p style="color:#ef4444; font-weight:bold; padding:20px; text-align:center;">❌ ERRORE: Connessione fallita. Controlla il parametro r= nell'URL.</p>`;
+            kitchenContainer.innerHTML = `<p style="color:#ef4444; font-weight:bold; padding:20px; text-align:center;">❌ ERRORE: Connessione fallita. Controlla lo slug nell'URL.</p>`;
         }
     }
 }
