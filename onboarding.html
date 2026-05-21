@@ -3,13 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ZeroFila - SuperAdmin AI Advanced Onboarding</title>
-  
-  <!-- Collegamento allo stile grafico unificato anti-crash -->
+  <title>ZeroFila - SuperAdmin Studio Universale</title>
   <link rel="stylesheet" href="style.css" />
   
   <style>
-    /* Estensioni di stile specifiche per la console privata SuperAdmin */
     .admin-box { max-width: 650px; margin: 40px auto; background: var(--bg-card, #1e293b); padding: 35px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
     .admin-box h1 { color: var(--color-pronto, #10b981); font-size: 1.6rem; margin-bottom: 6px; }
     .subtitle { color: var(--text-muted, #94a3b8); font-size: 0.9rem; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; }
@@ -22,7 +19,6 @@
     button:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
     #status { padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold; font-size: 0.95rem; display: none; line-height: 1.4; }
     
-    /* Box Stile di evidenza per i link del commerciante */
     .links-box { display: none; background: #0f172a; border: 1px dashed #10b981; border-radius: 10px; padding: 20px; margin-top: 20px; }
     .links-box h3 { margin-top: 0; color: #10b981; font-size: 1.1rem; }
     .link-row { background: #1e293b; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #334155; word-break: break-all; }
@@ -35,87 +31,74 @@
     .qr-card img { max-width: 100%; height: auto; margin: 8px auto; display: block; border-radius: 4px; }
   </style>
 
-  <!-- Caricamento della libreria QR Code forzato ad inizio pagina per evitare crash di esecuzione -->
   <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
   <div class="admin-box">
-    <h1>⚡ ZeroFila SuperAdmin Studio</h1>
-    <div class="subtitle">Strumento riservato per l'onboarding lampo dei locales (Menu AI, Loghi e QR-Kit).</div>
+    <h1>⚡ ZeroFila SuperAdmin Universale</h1>
+    <div class="subtitle">Console di onboarding dinamica e scalabile per qualsiasi tipologia di negozio SaaS.</div>
     
-    <!-- 1. Menu a tendina dei locali -->
-    <label for="select-ristorante">1. Seleziona il Locale da configurare</label>
+    <label for="select-ristorante">1. Seleziona l'Attività Commerciale</label>
     <select id="select-ristorante">
-      <option value="">Caricamento locali in corso...</option>
+      <option value="">Caricamento attività in corso...</option>
     </select>
 
-    <!-- 2. Sezione File Caricamenti -->
     <div class="row-flex">
       <div class="col-flex">
-        <label for="logo-ristorante">2. Carica Logo del Locale</label>
+        <label for="logo-ristorante">2. Carica Logo Attività</label>
         <input type="file" id="logo-ristorante" accept="image/*">
       </div>
       <div class="col-flex">
-        <label for="foto-menu">3. Foto Menù Cartaceo (Per AI)</label>
+        <label for="foto-menu">3. Foto Listino / Volantino (AI)</label>
         <input type="file" id="foto-menu" accept="image/*">
       </div>
     </div>
 
-    <!-- 3. Sezione Configurazione Marketing QR -->
-    <div class="row-flex" style="border-top: 1px dashed #334155; padding-top: 15px; margin-top: 10px;">
+    <div class="row-flex" style="border-top: 1px solid #334155; padding-top: 15px; margin-top: 10px;">
       <div class="col-flex">
         <label for="check-qr-generico">Genera QR Vetrofania / Social?</label>
         <select id="check-qr-generico">
-          <option value="si">Sì, genera Link generico (es. Asporto)</option>
-          <option value="no">No, locale solo al tavolo</option>
+          <option value="si">Sì, genera Link d'ingresso generico</option>
+          <option value="no">No, solo tavoli/reparti fisici</option>
         </select>
       </div>
       <div class="col-flex">
-        <label for="num-tavoli-qr">Numero tavoli (QR-Kit sala)</label>
-        <input type="number" id="num-tavoli-qr" value="0" min="0" placeholder="es: 15">
+        <label for="num-tavoli-qr">Numero Tavoli / Postazioni / Reparti</label>
+        <input type="number" id="num-tavoli-qr" value="0" min="0" placeholder="es: 10">
       </div>
     </div>
 
-    <!-- Pulsante di avvio transazione massiva -->
-    <button type="button" id="btn-avvia-onboarding">🚀 Esegui Onboarding Completo a Schermo</button>
+    <button type="button" id="btn-avvia-onboarding">🚀 Esegui Configurazione Scalabile Locale</button>
 
-    <!-- Console di log e avanzamento -->
     <div id="status"></div>
     
-    <!-- BOX AUTOMATICO LINK IN PRIMO PIANO (100% DINAMICO) -->
     <div id="links-ristoratore-box" class="links-box">
-      <h3>📋 Collegamenti Privati del Commerciante</h3>
-      <p style="font-size:0.85rem; color:#94a3b8; margin:0;">Invia questi link al ristoratore. Potrà aprirli dal telefono e salvarli sulla Home come un'applicazione.</p>
+      <h3>📋 Collegamenti Privati del Commerciante (100% Isolati)</h3>
+      <p style="font-size:0.85rem; color:#94a3b8; margin:0;">Invia questi link al titolare del negozio per fargli gestire gli ordini.</p>
       
       <div class="link-row">
-        <span class="link-label">📱 Link Menù Digitale Clienti</span>
+        <span class="link-label">📱 Link Catalogo / Menù Digitale Clienti</span>
         <a id="link-utente-target" class="link-url" href="#" target="_blank">Generazione...</a>
       </div>
       
       <div class="link-row">
-        <span class="link-label">👨‍🍳 Link Monitor Cucina (KDS)</span>
+        <span class="link-label">👨‍🍳 Link Schermo Cucina / Monitor Ordini (KDS)</span>
         <a id="link-cucina-target" class="link-url" href="#" target="_blank">Generazione...</a>
       </div>
     </div>
     
-    <!-- Contenitore di calcolo invisibile usato dalla libreria QR per evitare crash di rendering -->
     <div id="qr-hidden-generator" style="display: none;"></div>
     
-    <!-- Box dei risultati dei QR scaricabili -->
-    <h3 id="title-qr-box" style="margin-top:25px; font-size:1.1rem; display:none; color:var(--color-pronto);">📋 QR-Kit Generato (Pronto da salvare/stampare):</h3>
+    <h3 id="title-qr-box" style="margin-top:25px; font-size:1.1rem; display:none; color:var(--color-pronto);">📋 QR-Kit Generato (Pronto da stampare):</h3>
     <div id="qr-preview-box"></div>
   </div>
 
-  <!-- SCRIPT LOGICO UNIFICATO DI ONBOARDING (Garantisce la modularità del SaaS ed esclude i bug di cache) -->
   <script type="module">
     import { supabaseClient } from './supabase.js';
 
     const selectRistorante = document.getElementById("select-ristorante");
     const logoInput = document.getElementById("logo-ristorante");
-    const menuInput = document.getElementById("foto-menu");
-    const checkQrGenerico = document.getElementById("check-qr-generico");
-    const numTavoliInput = document.getElementById("num-tavoli-qr");
     const btnAvvia = document.getElementById("btn-avvia-onboarding");
     const statusDiv = document.getElementById("status");
     const qrPreviewBox = document.getElementById("qr-preview-box");
@@ -127,9 +110,6 @@
 
     let listaLocaliCompleta = [];
 
-    /**
-     * Recupera l'elenco completo dei ristoranti inseriti nel SaaS per popolare il menu a tendina
-     */
     async function caricaRistoranti() {
         try {
             const { data: ristoranti, error } = await supabaseClient
@@ -140,7 +120,7 @@
             if (error) throw error;
             listaLocaliCompleta = ristoranti || [];
 
-            selectRistorante.innerHTML = '<option value="">-- Seleziona un ristorante --</option>';
+            selectRistorante.innerHTML = '<option value="">-- Seleziona un negozio --</option>';
             listaLocaliCompleta.forEach(locale => {
                 const option = document.createElement("option");
                 option.value = locale.id;
@@ -148,55 +128,20 @@
                 selectRistorante.appendChild(option);
             });
         } catch (err) {
-            console.error("Errore lettura ristoranti:", err);
-            selectRistorante.innerHTML = '<option value="">Errore caricamento locali</option>';
+            console.error(err);
         }
     }
 
-    /**
-     * Gestisce l'upload sicuro del Logo aziendale nel bucket pubblico 'assets' di Supabase
-     */
-    async function uploadLogoA_Storage(file, locale) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = locale.slug + "-logo-" + Date.now() + "." + fileExt;
-        const filePath = "loghi/" + fileName;
-
-        const { error: uploadError } = await supabaseClient.storage
-            .from('assets')
-            .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabaseClient.storage
-            .from('assets')
-            .getPublicUrl(filePath);
-
-        const { error: updateError } = await supabaseClient
-            .from("ristoranti")
-            .update({ logo: data.publicUrl })
-            .eq("id", locale.id);
-
-        if (updateError) throw updateError;
-        return data.publicUrl;
-    }
-
-    /**
-     * Genera vettorialmente i QR Code a schermo senza subire rallentamenti di memoria
-     */
     function generaQrKitGrafico(locale, generaGenerico, numeroTavoli) {
         qrPreviewBox.innerHTML = "";
         titleQrBox.style.display = "block";
         const hiddenGen = document.getElementById("qr-hidden-generator");
-
-        // Utilizzo di URL nativo anche per la composizione del link del QR Code
-        const baseLinkURL = new URL(window.location.origin + "/");
-        baseLinkURL.searchParams.set("r", locale.slug);
-        const baseLink = baseLinkURL.toString();
+        const baseLink = window.location.origin + "/?r=" + locale.slug;
 
         if (generaGenerico === "si") {
             const card = document.createElement("div");
             card.className = "qr-card";
-            card.innerHTML = "<strong>🔗 QR GENERICO</strong><br><div id='qr-gen-target' style='display:flex; justify-content:center; margin:10px 0;'></div><span style='font-size:0.7rem; color:var(--color-pronto);'>" + locale.slug + "</span>";
+            card.innerHTML = "<strong>🔗 INGRESSO GENERICO</strong><br><div id='qr-gen-target' style='display:flex; justify-content:center; margin:10px 0;'></div><span style='font-size:0.7rem; color:var(--color-pronto);'>" + locale.slug + "</span>";
             qrPreviewBox.appendChild(card);
             
             hiddenGen.innerHTML = "";
@@ -212,9 +157,8 @@
                 const tavoloLink = baseLink + "&tavolo=" + i;
                 const cardTavolo = document.createElement("div");
                 cardTavolo.className = "qr-card";
-                
                 const targetId = "qr-tavolo-target-" + i;
-                cardTavolo.innerHTML = "<strong>🪑 TAVOLO " + i + "</strong><br><div id='" + targetId + "' style='display:flex; justify-content:center; margin:10px 0;'></div><span style='font-size:0.7rem; color:var(--text-muted);'>?tavolo=" + i + "</span>";
+                cardTavolo.innerHTML = "<strong>📍 POSTAZIONE / TAVOLO " + i + "</strong><br><div id='" + targetId + "' style='display:flex; justify-content:center; margin:10px 0;'></div><span style='font-size:0.7rem; color:var(--text-muted);'>?tavolo=" + i + "</span>";
                 qrPreviewBox.appendChild(cardTavolo);
 
                 setTimeout(() => {
@@ -229,40 +173,24 @@
         }
     }
 
-    /**
-     * Event Listener Principale di Esecuzione Onboarding Amministratore (Versione Gratuita)
-     */
     btnAvvia.onclick = async () => {
         const ristoranteId = selectRistorante.value;
-        const logoFile = logoInput.files[0]; // Riparata l'estrazione binaria singola corretta
-        const generaGenerico = checkQrGenerico.value;
-        const numeroTavoli = parseInt(numTavoliInput.value) || 0;
+        const generaGenerico = document.getElementById("check-qr-generico").value;
+        const numeroTavoli = parseInt(document.getElementById("num-tavoli-qr").value) || 0;
 
-        if (!ristoranteId) return alert("Seleziona il ristorante su cui lavorare!");
+        if (!ristoranteId) return alert("Seleziona il negozio da configurare!");
 
         const localeSelezionato = listaLocaliCompleta.find(r => r.id === ristoranteId);
         
         statusDiv.style.display = "block";
-        statusDiv.style.background = "rgba(234, 179, 8, 0.1)";
-        statusDiv.style.color = "#eab308";
-        statusDiv.style.border = "1px solid #eab308";
         statusDiv.innerHTML = "⏳ Generazione configurazioni in corso...<br>";
         btnAvvia.disabled = true;
 
         try {
-            // 1. REPERIMENTO DINAMICO DEL DOMINIO CORRENTE (Garantisce la scalabilità del SaaS)
-            const dominioCorrente = window.location.origin;
-
-            // Costruzione impeccabile tramite oggetto URL nativo del browser (Inietta automaticamente barre e punti di domanda)
-            const urlBaseMenu = new URL(dominioCorrente + "/");
-            urlBaseMenu.searchParams.set("r", localeSelezionato.slug);
-            const urlMenuClienti = urlBaseMenu.toString();
-
-            const urlBaseCucina = new URL(dominioCorrente + "/kitchen.html");
-            urlBaseCucina.searchParams.set("r", localeSelezionato.slug);
-            const urlPannelloCucina = urlBaseCucina.toString();
+            // Estrazione e composizione dinamica degli URL d'ingresso 100% scalabile
+            const urlMenuClienti = window.location.origin + "/?r=" + localeSelezionato.slug;
+            const urlPannelloCucina = window.location.origin + "/kitchen.html?r=" + localeSelezionato.slug;
             
-            // Iniezione sicura e immediata dei link corretti a schermo
             linkUtenteTarget.href = urlMenuClienti;
             linkUtenteTarget.textContent = urlMenuClienti;
             
@@ -271,32 +199,15 @@
             
             if (linksBox) linksBox.style.display = "block";
 
-            // 2. Upload Logo se caricato nel form
-            if (logoFile) {
-                statusDiv.innerHTML += "🖼️ Upload del logo aziendale in corso...<br>";
-                await uploadLogoA_Storage(logoFile, localeSelezionato);
-                statusDiv.innerHTML += "✅ Logo inserito nello storage pubblico e collegato.<br>";
-            }
-
-            // 3. Generazione automatica dei codici QR a schermo
             if (generaGenerico === "si" || numeroTavoli > 0) {
-                statusDiv.innerHTML += "📐 Generazione grafica del QR-Kit in corso...<br>";
                 generaQrKitGrafico(localeSelezionato, generaGenerico, numeroTavoli);
-                statusDiv.innerHTML += "✅ QR Code pronti e visualizzati a schermo.<br>";
             }
 
-            statusDiv.style.background = "rgba(16, 185, 129, 0.1)";
-            statusDiv.style.color = "#10b981";
-            statusDiv.style.border = "1px solid #10b981";
-            statusDiv.innerHTML += "🚀 <strong>Onboarding completato con successo! Collegamenti pronti per il commerciante.</strong><br>";
+            statusDiv.innerHTML = "🚀 Onboarding completato con successo!";
             btnAvvia.disabled = false;
 
         } catch (err) {
-            statusDiv.style.display = "block";
-            statusDiv.style.background = "rgba(239, 68, 68, 0.1)";
-            statusDiv.style.color = "#ef4444";
-            statusDiv.style.border = "1px solid #ef4444";
-            statusDiv.innerHTML += "❌ <strong>ERRORE PROCEDURA:</strong> " + err.message + "<br>";
+            statusDiv.innerHTML = "❌ ERRORE: " + err.message;
             btnAvvia.disabled = false;
         }
     };
