@@ -71,7 +71,7 @@ export function renderCart(ristoranteId) {
 
 export async function initMenu() {
     if (!menuContainer) return;
-    menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
+    menuContainer.innerHTML = `<div class="loading-state">Connessione al database...</div>`;
 
     const slug = getRistoranteSlug() || "al-panetto";
 
@@ -82,7 +82,7 @@ export async function initMenu() {
             .eq("slug", slug)
             .single();
 
-        if (restError || !ristorante) throw new Error("Locale non trovato nel database.");
+        if (restError || !ristorante) throw new Error("Attività non trovata nel database.");
 
         currentRistoranteObj = ristorante;
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
@@ -103,7 +103,7 @@ export async function initMenu() {
         const prodotti = prodRes.data || [];
 
         if (!categorie.length || !prodotti.length) {
-            menuContainer.innerHTML = `<p class="empty-msg">Il menu è attualmente vuoto.</p>`;
+            menuContainer.innerHTML = `<p class="empty-msg">Il listino è attualmente vuoto.</p>`;
             return;
         }
 
@@ -129,7 +129,7 @@ export async function initMenu() {
                 card.innerHTML = `
                     <div class="prodotto-info">
                         <h3>${escapeHtml(p.nome)}</h3>
-                        <p>${escapeHtml(p.descrizione || 'Scegli le varianti al click')}</p>
+                        <p>${escapeHtml(p.descrizione || 'Farcisci o modifica al click')}</p>
                         <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                     </div>
                     <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}" data-gruppo="${escapeHtml(p.gruppo_extra || '')}" data-forzafarcitura="${isNudo ? 'true' : 'false'}">${testoBottone}</button>
@@ -248,7 +248,7 @@ async function apriModaleVarianti(carrelloId) {
         chk.addEventListener("change", () => {
             if (vModal.querySelectorAll(".chk-gratis-salsa:checked").length > 3) {
                 chk.checked = false;
-                alert("Puoi scegliere un massimo di 3 opzioni gratuite!");
+                alert("Puoi scegliere un massimo di 3 salse gratuite!");
             }
         });
     });
@@ -448,7 +448,7 @@ async function elaboraInvioComanda(modal) {
         
         confirmBtn.disabled = false;
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
-        confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
+        confirmBtn.innerHTML = "💬 Apri Chat e Invia Comanda";
 
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
