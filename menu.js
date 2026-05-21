@@ -368,8 +368,10 @@ function showOrderModal() {
 
 async function elaboraInvioComanda(modal) {
     const confirmBtn = modal.querySelector("#modal-confirm");
+    const cancelBtn = modal.querySelector("#modal-cancel");
+    
     confirmBtn.disabled = true;
-    confirmBtn.textContent = "Invio in corso...";
+    confirmBtn.textContent = "⏳ Registrazione ordine...";
 
     try {
         const cart = getCartItems(currentRistoranteObj.id);
@@ -391,6 +393,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
+        // 1. Salvataggio su database
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -409,6 +412,7 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
+        // 2. Inserimento righe prodotti
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -419,7 +423,7 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // --- COMPOSIZIONE MONOLITICA DEL MESSAGGIO WHATSAPP ANTI-BUG ---
+        // 3. Formattazione pulita del messaggio
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
         msg += `--------------------------------\n\n`;
@@ -438,30 +442,35 @@ async function elaboraInvioComanda(modal) {
         
         msg += `\n--------------------------------\n`;
         msg += `💰 *TOTALE DA PAGARE:* € ${formatPrice(subtotale)}\n\n`;
-        msg += `✨ Ordinato comodamente con *ZeroFila*`;
+        msg += `✨ Ordinato con *ZeroFila*`;
 
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
+        // Pulisce il carrello a schermo
         saveCart([], currentRistoranteObj.id);
-        modal.remove();
-        
-        const rBox = document.getElementById("status-error-box");
-        if (rBox) rBox.style.display = "none"; // Pulisce all'istante il vecchio blocco rosso residuo
-        
         renderCart(currentRistoranteObj.id);
 
-        // Reindirizzamento nativo compresso infallibile per smartphone
-        window.location.href = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+        // 🚀 ATTIVAZIONE BLINDATURA: Trasforma il pulsante in un link diretto a WhatsApp
+        if (cancelBtn) cancelBtn.style.display = "none";
+        
+        confirmBtn.disabled = false;
+        confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
+        confirmBtn.innerHTML = "💬 Invia su WhatsApp Ora";
+
+        // Il click successivo è 100% manuale e bypassa i blocchi mobile ad occhi chiusi
+        confirmBtn.onclick = () => {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = "Apertura chat...";
+            modal.remove();
+            window.location.href = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+        };
+
+        showToast("✅ Registrato! Tocca il tasto verde per avviare WhatsApp.", "success");
 
     } catch (err) {
         console.error(err);
-        const errContainer = document.getElementById("status-error-box") || document.getElementById("status");
-        if (errContainer) {
-            errContainer.style.display = "block";
-            errContainer.textContent = "❌ Errore procedura: " + err.message;
-        }
-    } finally {
+        showToast("❌ Errore procedura: " + err.message, "error");
         if (confirmBtn) {
             confirmBtn.disabled = false;
             confirmBtn.textContent = "✅ Invia Ordine";
@@ -469,7 +478,7 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
-// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
+// --- COORDIDAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
