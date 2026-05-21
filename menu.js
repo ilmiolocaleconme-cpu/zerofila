@@ -8,7 +8,6 @@ const cartTotalElement = document.getElementById("cart-total");
 
 let currentRistoranteObj = null;
 
-// --- GESTIONE CORE CARRELLO UNIFICATA MULTI-TENANT ---
 export function getCartItems(ristoranteId) {
     const key = ristoranteId ? `zf_cart_${ristoranteId}` : "zf_cart_generic";
     const saved = localStorage.getItem(key);
@@ -70,7 +69,6 @@ export function renderCart(ristoranteId) {
     if (cartTotalElement) cartTotalElement.textContent = "€ " + formatPrice(totale);
 }
 
-// --- LOGICA DI CARICAMENTO PRODOTTI DA SUPABASE ---
 export async function initMenu() {
     if (!menuContainer) return;
     menuContainer.innerHTML = `<div class="loading-state">Caricamento prodotti da Supabase...</div>`;
@@ -152,7 +150,6 @@ export async function initMenu() {
     }
 }
 
-// --- APERTURA DELLA FINESTRA DI PERSONALIZZAZIONE (MODALE) ---
 async function apriModaleVarianti(carrelloId) {
     if (!currentRistoranteObj) return;
     let cart = getCartItems(currentRistoranteObj.id);
@@ -293,7 +290,6 @@ async function apriModaleVarianti(carrelloId) {
     };
 }
 
-// --- LOGICA MODALE DATI CLIENTE ---
 function initOrderButtonLogic() {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -359,15 +355,12 @@ function showOrderModal() {
         document.getElementById("delivery-fields").style.display = val === "delivery" ? "block" : "none";
     };
 
-    aggiornaCampiVisibles(); // Protezione se chiamata in background
     aggiornaCampiVisibili();
     tipoSelect.addEventListener("change", aggiornaCampiVisibili);
 
     modal.querySelector("#modal-cancel").onclick = () => modal.remove();
     modal.querySelector("#modal-confirm").onclick = () => elaboraInvioComanda(modal);
 }
-
-function aggiornaCampiVisibles() {} // Stub di sicurezza anti-crash
 
 async function elaboraInvioComanda(modal) {
     const confirmBtn = modal.querySelector("#modal-confirm");
@@ -396,7 +389,7 @@ async function elaboraInvioComanda(modal) {
 
         const subtotale = cart.reduce((sum, item) => sum + Number(item.prezzo) * item.quantita, 0);
 
-        // 1. Salvataggio su database Supabase
+        // 1. Inserimento in database dell'ordine principale
         const { data: nuovoOrdine, error } = await supabaseClient
             .from("ordini")
             .insert([{
@@ -415,7 +408,7 @@ async function elaboraInvioComanda(modal) {
 
         if (error) throw error;
 
-        // 2. Inserimento righe prodotti ordinati
+        // 2. Inserimento dei singoli prodotti associati
         const prodottiPayload = cart.map(item => ({
             ordine_id: nuovoOrdine.id,
             prodotto_id: item.id,
@@ -426,7 +419,7 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        // 3. APPLICAZIONE SCRITTURA NATIVA MONOLITICA DEL MESSAGGIO (Eliminato refuso esterno)
+        // 3. Composizione del testo WhatsApp commerciale pulito
         const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
         
         let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
@@ -451,25 +444,23 @@ async function elaboraInvioComanda(modal) {
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
-        // Svuota e renderizza il carrello locale vuoto
         saveCart([], currentRistoranteObj.id);
         renderCart(currentRistoranteObj.id);
 
-        // 🚀 TRASFORMAZIONE PULSANTE IN DISPOSITIVO DI SICUREZZA ANTI-BLOCCO POPUP SMARTPHONE
         if (cancelBtn) cancelBtn.style.display = "none";
         
         confirmBtn.disabled = false;
         confirmBtn.style.cssText = "width:100%; padding:15px; background:#25D366; color:white; font-weight:bold; font-size:1.1rem; border-radius:8px; border:none; cursor:pointer; box-shadow: 0 4px 12px rgba(37,211,102,0.3); margin-top:15px;";
         confirmBtn.innerHTML = "💬 Apri Chat e Conferma";
 
-        // Click manuale diretto: sblocca il reindirizzamento immediato ad occhi chiusi su iOS ed Android
+        // Tasto ad azione manuale vincolata: sblocca WhatsApp eliminando i filtri popup dei telefoni
         confirmBtn.onclick = () => {
             confirmBtn.disabled = true;
             confirmBtn.textContent = "Apertura WhatsApp...";
             modal.remove();
             
-            const linkInfallibileWhatsApp = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
-            window.location.href = linkInfallibileWhatsApp;
+            const linkFinaleWH = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
+            window.location.href = linkFinaleWH;
         };
 
         showToast("✅ Registrato! Tocca il tasto verde per avviare WhatsApp.", "success");
@@ -484,7 +475,6 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
-// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
