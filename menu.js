@@ -1,6 +1,5 @@
 import { supabaseClient } from './supabase.js';
 import { getRistoranteSlug, escapeHtml, formatPrice, showToast } from './utils.js';
-import { componiMessaggioWhatsApp } from './messaggi.js';
 
 const menuContainer = document.getElementById("menu-container");
 const restNameHeader = document.getElementById("restaurant-name");
@@ -89,7 +88,9 @@ export async function initMenu() {
 
         currentRistoranteObj = ristorante;
         sessionStorage.setItem("zf_current_ristorante", JSON.stringify(ristorante));
-        if (restNameHeader) restNameHeader.textContent = ristorante.nome;
+        
+        const nomeVisualizzato = ristorante.nome || ristorante.name || "ZeroFila";
+        if (restNameHeader) restNameHeader.textContent = nomeVisualizzato;
 
         const [catRes, prodRes] = await Promise.all([
             supabaseClient.from("categorie").select("*").eq("ristorante_id", ristorante.id).order("ordine", { ascending: true }),
@@ -130,7 +131,7 @@ export async function initMenu() {
                 card.innerHTML = `
                     <div class="prodotto-info">
                         <h3>${escapeHtml(p.nome)}</h3>
-                        <p>${escapeHtml(p.descrizione || 'Scegli le varianti e i condimenti al click')}</p>
+                        <p>${escapeHtml(p.descrizione || 'Scegli le varianti al click')}</p>
                         <span class="prezzo">€ ${formatPrice(p.prezzo)}</span>
                     </div>
                     <button class="btn-add-to-cart" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}" data-prezzo="${p.prezzo}" data-descrizione="${escapeHtml(p.descrizione || '')}" data-gruppo="${escapeHtml(p.gruppo_extra || '')}" data-forzafarcitura="${isNudo ? 'true' : 'false'}">${testoBottone}</button>
@@ -292,7 +293,7 @@ async function apriModaleVarianti(carrelloId) {
     };
 }
 
-// --- LOGICA MODALE DATI CLIENTE ED INVIO DEFINITIVO WHATSAPP ---
+// --- LOGICA MODALE DATI CLIENTE ---
 function initOrderButtonLogic() {
     const btnProcedi = document.getElementById("send-order");
     if (btnProcedi) {
@@ -418,22 +419,48 @@ async function elaboraInvioComanda(modal) {
         }));
         await supabaseClient.from("ordine_prodotti").insert(prodottiPayload);
 
-        const msg = componiMessaggioWhatsApp(nome, telefono, tipo, tavolo, indirizzo, note, cart, subtotale, currentRistoranteObj.name || currentRistoranteObj.nome);
+        // --- COMPOSIZIONE MONOLITICA DEL MESSAGGIO WHATSAPP ANTI-BUG ---
+        const nomeInsegna = currentRistoranteObj.nome || currentRistoranteObj.name || "ZeroFila";
+        let msg = `🛒 *NUOVO ORDINE DA ${nomeInsegna.toUpperCase()}*\n`;
+        msg += `--------------------------------\n\n`;
+        msg += `👤 *Cliente:* ${nome}\n`;
+        msg += `📱 *Telefono:* ${telefono}\n`;
+        msg += `📦 *Tipo:* ${tipo.toUpperCase()}\n`;
+        if (tavolo) msg += `🪑 *Tavolo:* ${tavolo}\n`;
+        if (indirizzo) msg += `📍 *Indirizzo:* ${indirizzo}\n`;
+        if (note) msg += `📝 *Note:* ${note}\n`;
+        msg += `\n📋 *PRODOTTI ORDINATI:*\n`;
+        
+        cart.forEach(item => {
+            msg += `• ${item.quantita}x _${item.nome}_ - € ${formatPrice(item.prezzo * item.quantita)}\n`;
+            if (item.modificheStr) msg += `  └ _Variazioni:_ ${item.modificheStr}\n`;
+        });
+        
+        msg += `\n--------------------------------\n`;
+        msg += `💰 *TOTALE DA PAGARE:* € ${formatPrice(subtotale)}\n\n`;
+        msg += `✨ Ordinato comodamente con *ZeroFila*`;
 
         const numeroLocale = currentRistoranteObj.telefono ? currentRistoranteObj.telefono.toString().replace(/\s+/g, '') : "393896190004";
         const telefonoFinale = numeroLocale.startsWith("+") || numeroLocale.startsWith("39") ? numeroLocale : "39" + numeroLocale;
 
         saveCart([], currentRistoranteObj.id);
         modal.remove();
+        
+        const rBox = document.getElementById("status-error-box");
+        if (rBox) rBox.style.display = "none"; // Pulisce all'istante il vecchio blocco rosso residuo
+        
         renderCart(currentRistoranteObj.id);
-        showToast("✅ Ordine registrato!");
 
-        // Reindirizzamento nativo pre-codificato infallibile contro i blocchi mobile
+        // Reindirizzamento nativo compresso infallibile per smartphone
         window.location.href = "https://whatsapp.com" + telefonoFinale + "&text=" + encodeURIComponent(msg);
 
     } catch (err) {
         console.error(err);
-        showToast(err.message, "error");
+        const errContainer = document.getElementById("status-error-box") || document.getElementById("status");
+        if (errContainer) {
+            errContainer.style.display = "block";
+            errContainer.textContent = "❌ Errore procedura: " + err.message;
+        }
     } finally {
         if (confirmBtn) {
             confirmBtn.disabled = false;
@@ -442,11 +469,10 @@ async function elaboraInvioComanda(modal) {
     }
 }
 
-// --- INTERCETTATORE GENERALIZZATO EVENTI CLICK CLICK ---
+// --- COORDINAMENTO DEI CLICK SULLO SCHERMO ---
 document.addEventListener("click", (e) => {
     if (!currentRistoranteObj) return;
 
-    // 1. Tasto Più (+)
     if (e.target.classList.contains("btn-cart-piu")) {
         const cid = e.target.getAttribute("data-cid");
         let cart = getCartItems(currentRistoranteObj.id);
@@ -458,7 +484,6 @@ document.addEventListener("click", (e) => {
         }
     }
 
-    // 2. Tasto Meno (-)
     if (e.target.classList.contains("btn-cart-meno")) {
         const cid = e.target.getAttribute("data-cid");
         let cart = getCartItems(currentRistoranteObj.id);
@@ -474,13 +499,11 @@ document.addEventListener("click", (e) => {
         }
     }
 
-    // 3. Tasto Innesco Personalizza del Carrello
     if (e.target.classList.contains("btn-apri-varianti")) {
         const cid = e.target.getAttribute("data-cid");
         apriModaleVarianti(cid);
     }
 
-    // 4. Tasto Aggiungi Principale del Menu
     if (e.target.classList.contains("btn-add-to-cart")) {
         const id = e.target.getAttribute("data-id");
         const nome = e.target.getAttribute("data-nome");
